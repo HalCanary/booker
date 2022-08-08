@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"mime/quotedprintable"
+	"net/http"
 	"net/mail"
 	"net/smtp"
 	"net/textproto"
@@ -24,9 +25,8 @@ type EmailSecrets struct {
 }
 
 type Attachment struct {
-	Filename    string
-	ContentType string
-	Data        []byte
+	Filename string
+	Data     []byte
 }
 
 type Email struct {
@@ -100,7 +100,7 @@ func (mail Email) Make() []byte {
 	}
 	for _, attachment := range mail.Attachments {
 		w, _ := mw.CreatePart(textproto.MIMEHeader{
-			"Content-Type":              []string{contentType(attachment.ContentType)},
+			"Content-Type":              []string{http.DetectContentType(attachment.Data)},
 			"Content-Transfer-Encoding": []string{"base64"},
 			"Content-Disposition":       []string{contentDisposition(attachment.Filename)},
 			"MIME-Version":              []string{"1.0"},
@@ -122,13 +122,6 @@ func contentDisposition(filename string) string {
 		return "attachment"
 	}
 	return fmt.Sprintf("attachment; filename=%q", filename)
-}
-
-func contentType(ct string) string {
-	if ct == "" {
-		return "application/octet-stream"
-	}
-	return ct
 }
 
 func quotedprintableWrite(src string, dst io.Writer) {
