@@ -20,7 +20,7 @@ func EbookConvert(src, dst string, info EbookInfo) error {
 	)
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Error: %w\nCombinedOutput:\n%s", string(stdoutStderr))
+		return fmt.Errorf("Error: %w\nCombinedOutput:\n%s", err, string(stdoutStderr))
 	}
 	return nil
 }
