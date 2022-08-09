@@ -7,6 +7,7 @@ import (
 	"golang.org/x/net/html"
 )
 
+// Clean up a HTML fragment.
 func Cleanup(node *Node) *Node {
 	node = cleanupStyle(node)
 	return node

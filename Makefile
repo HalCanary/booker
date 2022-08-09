@@ -1,7 +1,7 @@
 # Copyright 2022 Hal Canary
 # Use of this program is governed by the file LICENSE.
 
-all: booker
+all: booker doc
 
 booker: $(wildcard *.go)
 	go build .
@@ -15,4 +15,9 @@ clean-all:
 test:
 	go test .
 
-.PHONY: clean clean-all test all
+DOCUMENTATION.md: $(wildcard *.go)
+	{ echo '```'; go doc -all .; echo '```'; } > $@
+
+doc: DOCUMENTATION.md
+
+.PHONY: clean clean-all test all doc

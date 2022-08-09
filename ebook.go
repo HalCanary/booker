@@ -18,6 +18,7 @@ type Chapter struct {
 	Modified time.Time
 }
 
+// Ebook content and metadata.
 type EbookInfo struct {
 	Authors  string
 	Cover    string
@@ -28,6 +29,7 @@ type EbookInfo struct {
 	Modified time.Time
 }
 
+// Return the time of most recently modified chapter.
 func CalculateLastModified(chapters []Chapter) time.Time {
 	var result time.Time
 	for _, ch := range chapters {
@@ -63,6 +65,7 @@ func head(title, style, comment string) *Node {
 	)
 }
 
+// Write the ebook into given directory as HTML5 documents.}|
 func Write(info EbookInfo, directory string, cacheDir string) (string, error) {
 	if info.Title == "" {
 		return "", nil

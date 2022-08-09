@@ -15,6 +15,7 @@ type Node = html.Node
 
 var whitespaceRegexp = regexp.MustCompile("\\s+")
 
+// Return a HTML comment with the given data.
 func Comment(data string) *Node {
 	if data == "" {
 		return nil
@@ -22,10 +23,12 @@ func Comment(data string) *Node {
 	return &Node{Type: html.CommentNode, Data: data}
 }
 
+// Return a HTML node with the given text.
 func TextNode(data string) *Node {
 	return &Node{Type: html.TextNode, Data: data}
 }
 
+// Return an element with given attributes and children.
 func Element(tag string, attributes map[string]string, children ...*Node) *Node {
 	node := &Node{Type: html.ElementNode, Data: tag}
 	for k, v := range attributes {
@@ -43,11 +46,12 @@ func Element(tag string, attributes map[string]string, children ...*Node) *Node 
 	return node
 }
 
+// Return an element with the given children.
 func Elem(tag string, children ...*Node) *Node {
 	return Element(tag, nil, children...)
 }
 
-// Generates html5 doc.
+// Generates HTML5 doc.
 func RenderDoc(w io.Writer, root *Node) error {
 	d := Node{Type: html.DocumentNode}
 	dt := Node{Type: html.DoctypeNode, Data: "html"}
@@ -56,6 +60,7 @@ func RenderDoc(w io.Writer, root *Node) error {
 	return html.Render(w, &d)
 }
 
+// Find the matching attributes, ignoring namespace.
 func GetAttribute(node *Node, key string) string {
 	if node != nil {
 		for _, attr := range node.Attr {
@@ -91,12 +96,14 @@ func extractTextImpl(root *Node, accumulator *strings.Builder) {
 	}
 }
 
+// Extract and combine all Text Nodes under given node.
 func ExtractText(root *Node) string {
 	var b strings.Builder
 	extractTextImpl(root, &b)
 	return b.String()
 }
 
+// Remove a node from it's parent.
 func Remove(node *Node) *Node {
 	if node != nil && node.Parent != nil {
 		node.Parent.RemoveChild(node)

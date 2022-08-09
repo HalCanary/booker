@@ -8,6 +8,7 @@ import (
 
 var newlineRegexp *regexp.Regexp = regexp.MustCompile("\n")
 
+// Call Calibre's `ebook-convert` command with metadata from `info`.
 func EbookConvert(src, dst string, info EbookInfo) error {
 	cmd := exec.Command(
 		"ebook-convert",

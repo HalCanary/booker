@@ -16,6 +16,8 @@ import (
 	"time"
 )
 
+// Data structure representing instructions for connecting to SMTP server.
+// Headers are additional headers to be added to outgoing email.
 type EmailSecrets struct {
 	SmtpHost string            `json:"SMTP_HOST"` // example: "smtp.gmail.com"
 	SmtpUser string            `json:"SMTP_USER"` // example: "halcanary@gmail.com"
@@ -24,11 +26,13 @@ type EmailSecrets struct {
 	Headers  map[string]string `json:"HEADERS"`
 }
 
+// Attachment for an email.
 type Attachment struct {
 	Filename string
 	Data     []byte
 }
 
+// An electric mail message.
 type Email struct {
 	Date        time.Time
 	To          []string
@@ -41,6 +45,7 @@ type Email struct {
 	Headers     map[string]string
 }
 
+// Read email secrets from the given file.
 func GetSecrets(path string) (EmailSecrets, error) {
 	var v EmailSecrets
 	b, err := os.ReadFile(path)
@@ -50,6 +55,7 @@ func GetSecrets(path string) (EmailSecrets, error) {
 	return v, err
 }
 
+// Send the given email using the provided SMTP secrets.
 func (m Email) Send(secrets EmailSecrets) error {
 	to := append(append(m.To, m.Cc...), m.Bcc...)
 	for i, a := range to {
@@ -64,6 +70,7 @@ func (m Email) Send(secrets EmailSecrets) error {
 	return smtp.SendMail(secrets.SmtpHost+":587", auth, secrets.SmtpUser, to, msg)
 }
 
+// Make, but do not send an email message.
 func (mail Email) Make() []byte {
 	var buffer bytes.Buffer
 	if mail.Date.IsZero() {
