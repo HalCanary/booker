@@ -1,7 +1,7 @@
 # Copyright 2022 Hal Canary
 # Use of this program is governed by the file LICENSE.
 
-all: booker doc
+all: test booker doc
 
 booker: $(wildcard *.go)
 	go build .

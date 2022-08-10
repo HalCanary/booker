@@ -32,7 +32,7 @@ func init() {
 			return info, err
 		}
 		info.Title = GetAttribute(findOneMatchingNode2(doc, "meta", "name", "twitter:title"), "content")
-		info.Cover = GetAttribute(findOneMatchingNode2(doc, "meta", "property", "og:image"), "content")
+		info.CoverURL = GetAttribute(findOneMatchingNode2(doc, "meta", "property", "og:image"), "content")
 		info.Authors = GetAttribute(findOneMatchingNode2(doc, "meta", "name", "twitter:creator"), "content")
 
 		descriptionNode := findOneMatchingNode2(doc, "div", "property", "description")

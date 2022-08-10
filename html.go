@@ -57,7 +57,9 @@ func RenderDoc(w io.Writer, root *Node) error {
 	dt := Node{Type: html.DoctypeNode, Data: "html"}
 	d.AppendChild(&dt)
 	d.AppendChild(root)
-	return html.Render(w, &d)
+	e := html.Render(w, &d)
+	w.Write([]byte{'\n'})
+	return e
 }
 
 // Find the matching attributes, ignoring namespace.

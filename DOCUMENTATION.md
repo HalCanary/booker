@@ -4,6 +4,7 @@ LICENSE.
 
 VARIABLES
 
+var BookAlreadyExists = errors.New("Book Already Exists")
 var UnsupportedUrlError = errors.New("unsupported url")
     Returned by a downloadFunction when the URL can not be handled.
 
@@ -56,14 +57,15 @@ type Chapter struct {
 }
 
 type EbookInfo struct {
-	Authors  string
-	Cover    string
-	Comments string
-	Title    string
-	Source   string
-	Language string
-	Chapters []Chapter
-	Modified time.Time
+	Authors   string
+	CoverURL  string
+	CoverPath string
+	Comments  string
+	Title     string
+	Source    string
+	Language  string
+	Chapters  []Chapter
+	Modified  time.Time
 }
     Ebook content and metadata.
 

@@ -10,7 +10,6 @@ import (
 	"image/color"
 	"image/jpeg"
 	_ "image/png"
-	"os"
 )
 
 func decode(src []byte) (image.Image, string, error) {
@@ -19,34 +18,32 @@ func decode(src []byte) (image.Image, string, error) {
 	return image.Decode(&b)
 }
 
-func saveJpeg(src []byte, filename string) error {
+func saveJpeg(src []byte) ([]byte, error) {
 	img, fmt, err := decode(src)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if fmt == "jpeg" {
-		return os.WriteFile(filename, src, 0o644)
+		return src, nil
 	}
-	return writeJpeg(img, filename, 80)
+	return writeJpeg(img, 80)
 }
 
-func writeJpeg(img image.Image, filename string, quality int) error {
+func writeJpeg(img image.Image, quality int) ([]byte, error) {
+	var buffer bytes.Buffer
 	options := jpeg.Options{Quality: quality}
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	return jpeg.Encode(file, img, &options)
+	err := jpeg.Encode(&buffer, img, &options)
+	return buffer.Bytes(), err
 }
 
-func saveJpegWithScale(src []byte, filename string, minWidth, minHeight int) error {
+func saveJpegWithScale(src []byte, minWidth, minHeight int) ([]byte, error) {
 	img, fmt, err := decode(src)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	imgSize := img.Bounds().Size()
 	if fmt == "jpeg" && imgSize.X >= minWidth && imgSize.Y >= minHeight {
-		return os.WriteFile(filename, src, 0o644)
+		return src, nil
 	}
 	if imgSize.X < minWidth || imgSize.Y < minHeight {
 		scale := float64(minWidth) / float64(imgSize.X)
@@ -60,5 +57,5 @@ func saveJpegWithScale(src []byte, filename string, minWidth, minHeight int) err
 		draw.BiLinear.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Over, nil)
 		img = dst
 	}
-	return writeJpeg(img, filename, 80)
+	return writeJpeg(img, 80)
 }

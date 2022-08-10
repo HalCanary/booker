@@ -18,14 +18,14 @@ func EbookConvert(src, dst string, info EbookInfo) error {
 		dst,
 		"--title", info.Title,
 		"--authors", info.Authors,
-		"--cover", info.Cover,
+		"--cover", info.CoverPath,
 		"--language", info.Language,
 		"--pubdate", info.Modified.Format(time.RFC3339),
 		"--comments", newlineRegexp.ReplaceAllString(strings.TrimSpace(info.Comments), " ¶ "),
 	)
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Error: %w\nCombinedOutput:\n%s", err, string(stdoutStderr))
+		return fmt.Errorf("Error: %w\nCmd:%#v\nCombinedOutput:\n%s", err, cmd.Args, string(stdoutStderr))
 	}
 	return nil
 }

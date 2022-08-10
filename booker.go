@@ -45,18 +45,22 @@ func main() {
 		check(err)
 
 		path, err := bk.Write("./dst", cache)
-		check(err)
-
-		log.Println(path)
+		if err == BookAlreadyExists {
+			log.Printf("%q already exists.\n", path)
+		} else {
+			check(err)
+			log.Println(path)
+		}
 
 		epubPath := path[:len(path)-len(filepath.Ext(path))] + ".epub"
 		epubBase := filepath.Base(epubPath)
 
-		start := time.Now()
-		err = EbookConvert(path, epubPath, bk)
-		check(err)
-		log.Printf("EbookConvert took %s\n", time.Now().Sub(start))
-
+		if !exists(epubPath) {
+			start := time.Now()
+			err = EbookConvert(path, epubPath, bk)
+			check(err)
+			log.Printf("EbookConvert took %s\n", time.Now().Sub(start))
+		}
 		log.Println(epubPath)
 
 		if send {

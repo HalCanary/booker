@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -20,14 +22,15 @@ type Chapter struct {
 
 // Ebook content and metadata.
 type EbookInfo struct {
-	Authors  string
-	Cover    string
-	Comments string
-	Title    string
-	Source   string
-	Language string
-	Chapters []Chapter
-	Modified time.Time
+	Authors   string
+	CoverURL  string
+	CoverPath string
+	Comments  string
+	Title     string
+	Source    string
+	Language  string
+	Chapters  []Chapter
+	Modified  time.Time
 }
 
 // Return the time of most recently modified chapter.
@@ -65,99 +68,160 @@ func head(title, style, comment string) *Node {
 	)
 }
 
-// Write the ebook into given directory as HTML5 documents.}|
-func (info *EbookInfo) Write(directory string, cacheDir string) (string, error) {
-	if info.Title == "" {
-		return "", nil
-	}
-	name := re.ReplaceAllString(NormalizeString(info.Title), "_")
-	if !info.Modified.IsZero() {
-		name = name + info.Modified.Format("_2006-01-02_150405")
-	}
-	dstDir := filepath.Join(directory, name)
-	os.MkdirAll(dstDir, 0o755)
-	tocPath := filepath.Join(dstDir, name+".html")
-	informationComment := infocomment(*info)
-	if info.Cover != "" {
-		rc, _, err := GetUrl(info.Cover, cacheDir, "", false)
-		if err == nil {
-			src, _ := io.ReadAll(rc)
-			rc.Close()
-			fn := filepath.Join(dstDir, name+".jpg")
-			if err = saveJpegWithScale(src, fn, 400, 600); err == nil {
-				info.Cover = fn
-			}
-		}
-	}
-	cover, err := filepath.Rel(dstDir, info.Cover)
-	if err != nil {
-		cover = info.Cover
-	}
-	for i, chapter := range info.Chapters {
-		var linkDiv *Node
-		if i+1 == len(info.Chapters) {
-			linkDiv = Elem("div",
-				link(chapter.Url, chapter.Url),
-				Elem("hr"),
-			)
-		}
-		out, err := os.Create(chapterPath(dstDir, i))
-		if err != nil {
-			return "", err
-		}
-		comment := ""
-		if chapter.Url != "" {
-			comment = fmt.Sprintf("\n%s\n", chapter.Url)
-		}
+var BookAlreadyExists = errors.New("Book Already Exists")
 
-		var modified *Node
-		if !chapter.Modified.IsZero() {
-			modified = Elem("div",
-				Elem("p", Elem("em", TextNode(chapter.Modified.Format("2006-01-02")))),
-				Elem("hr"),
-			)
-		}
-		RenderDoc(out,
-			Element("html", map[string]string{"lang": info.Language},
-				head(chapter.Title, bookStyle, comment),
-				Elem("body",
-					Element("h2", map[string]string{"class": "chapter"}, TextNode(chapter.Title)),
-					modified,
-					chapter.Content,
-					Elem("hr"),
-					linkDiv,
-				),
-			),
-		)
-		out.Write([]byte{'\n'})
-		out.Close()
+func writeChapter(path string, chapter Chapter, language string, last bool) error {
+	out, err := os.Create(path)
+	if err != nil {
+		return err
 	}
-	p := make([]*Node, 0, len(info.Chapters)*2+1)
-	p = append(p, TextNode("\n| "))
-	for i, chapter := range info.Chapters {
-		p = append(p,
-			link(chapterPath(".", i), chapter.Title),
-			TextNode("\n| "),
+	defer out.Close()
+
+	var linkDiv *Node
+	if last {
+		linkDiv = Elem("div",
+			link(chapter.Url, chapter.Url),
+			Elem("hr"),
 		)
 	}
-
-	out, err := os.Create(tocPath)
-	if err != nil {
-		return "", err
+	comment := ""
+	if chapter.Url != "" {
+		comment = fmt.Sprintf("\n%s\n", chapter.Url)
 	}
-	RenderDoc(out,
-		Element("html", map[string]string{"lang": info.Language},
-			head(info.Title, bookStyle, informationComment),
+
+	var modified *Node
+	if !chapter.Modified.IsZero() {
+		modified = Elem("div",
+			Elem("p", Elem("em", TextNode(chapter.Modified.Format("2006-01-02")))),
+			Elem("hr"),
+		)
+	}
+	return RenderDoc(out,
+		Element("html", map[string]string{"lang": language},
+			head(chapter.Title, bookStyle, comment),
 			Elem("body",
-				Element("h2", map[string]string{"class": "chapter"}, TextNode(info.Title)),
-				img(cover, "[COVER]"),
-				Elem("p", p...),
+				Element("h2", map[string]string{"class": "chapter"}, TextNode(chapter.Title)),
+				modified,
+				chapter.Content,
+				Elem("hr"),
+				linkDiv,
 			),
 		),
 	)
-	out.Write([]byte{'\n'})
-	out.Close()
-	return tocPath, nil
+}
+
+func getCover(url, dst, cacheDir string) error {
+	rc, _, err := GetUrl(url, cacheDir, "", false)
+	if err != nil {
+		return err
+	}
+	src, _ := io.ReadAll(rc)
+	rc.Close()
+	jpeg, err := saveJpegWithScale(src, 400, 600)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(dst, jpeg, 0o644); err != nil {
+		return err
+	}
+	return nil
+}
+
+func bookName(info EbookInfo) string {
+	name := re.ReplaceAllString(NormalizeString(info.Title), "_")
+	if info.Modified.IsZero() {
+		return name
+	}
+	return name + info.Modified.Format("_2006-01-02_150405")
+}
+
+// Write the ebook into given directory as HTML5 documents.}|
+func (info *EbookInfo) Write(directory string, cacheDir string) (string, error) {
+	if info.Title == "" {
+		return "", errors.New("title missing")
+	}
+	name := bookName(*info)
+	dstDir := filepath.Join(directory, name)
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		return "", err
+	}
+	if info.CoverURL != "" && info.CoverPath == "" {
+		fn := filepath.Join(dstDir, name+".jpg")
+		err := getCover(info.CoverURL, fn, cacheDir)
+		if err != nil {
+			log.Printf("error: %v", err)
+		} else {
+			info.CoverPath, err = filepath.Abs(fn)
+			if err != nil {
+				log.Printf("error: %v", err)
+				info.CoverPath = ""
+			}
+		}
+	}
+	dst := filepath.Join(dstDir, name+".html")
+	if exists(dst) {
+		return dst, BookAlreadyExists
+	}
+	err := writeBook(*info, dst, cacheDir)
+	if err != nil {
+		os.RemoveAll(dstDir)
+		return "", err
+	}
+	return dst, nil
+}
+
+func makeChapterLinks(chapters []Chapter) *Node {
+	p := Elem("p")
+	p.AppendChild(TextNode("\n| "))
+	for i, chapter := range chapters {
+		p.AppendChild(link(chapterPath(".", i), chapter.Title))
+		p.AppendChild(TextNode("\n| "))
+	}
+	return p
+}
+
+func filepathRel(basepath, targpath string) string {
+	if targpath == "" {
+		return ""
+	}
+	var err error
+	basepath, err = filepath.Abs(basepath)
+	if err != nil {
+		log.Printf("error: %s\n", err)
+		return ""
+	}
+	result, err := filepath.Rel(basepath, targpath)
+	if err != nil {
+		log.Printf("error: %s\n", err)
+		return ""
+	}
+	return result
+}
+
+func writeBook(info EbookInfo, tocPath, cacheDir string) error {
+	dstDir := filepath.Dir(tocPath)
+	for i, chapter := range info.Chapters {
+		path := chapterPath(dstDir, i)
+		last := i+1 == len(info.Chapters)
+		if err := writeChapter(path, chapter, info.Language, last); err != nil {
+			return err
+		}
+	}
+	out, err := os.Create(tocPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	return RenderDoc(out,
+		Element("html", map[string]string{"lang": info.Language},
+			head(info.Title, bookStyle, infoComment(info)),
+			Elem("body",
+				Element("h2", map[string]string{"class": "chapter"}, TextNode(info.Title)),
+				img(filepathRel(dstDir, info.CoverPath), "[COVER]"),
+				makeChapterLinks(info.Chapters),
+			),
+		),
+	)
 }
 
 func link(url, text string) *Node {
@@ -182,7 +246,7 @@ func wsb(builder *strings.Builder, strs ...string) {
 	}
 }
 
-func infocomment(info EbookInfo) string {
+func infoComment(info EbookInfo) string {
 	var builder strings.Builder
 	builder.WriteString("\n\n")
 	modified := ""
@@ -194,7 +258,7 @@ func infocomment(info EbookInfo) string {
 		{"title", info.Title},
 		{"authors", info.Authors},
 		{"chapter_count", strconv.Itoa(len(info.Chapters))},
-		{"cover", info.Cover},
+		{"cover", info.CoverURL},
 		{"last_modified", modified},
 		{"comments", info.Comments},
 	} {
