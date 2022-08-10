@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -66,7 +65,7 @@ func init() {
 		info.Modified = CalculateLastModified(info.Chapters)
 		log.Printf("%q -> discovered %d chapters (%s)\n", info.Title, len(info.Chapters), info.Modified)
 		for i, chapter := range info.Chapters {
-			fmt.Fprintf(os.Stderr, "%d ", i+1)
+			os.Stderr.Write([]byte{'.'})
 			chData, _, err := GetUrl(chapter.Url, cachePath, mainUrl, false)
 			if err != nil {
 				return info, err
@@ -79,7 +78,8 @@ func init() {
 				Cleanup(Remove(
 					findOneMatchingNode2(ch, "div", "class", "chapter-inner chapter-content")))
 		}
-		fmt.Fprintln(os.Stderr)
+		os.Stderr.Write([]byte{'\n'})
+		info.Language = "en"
 		return info, nil
 	})
 }

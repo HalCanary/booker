@@ -25,6 +25,7 @@ type EbookInfo struct {
 	Comments string
 	Title    string
 	Source   string
+	Language string
 	Chapters []Chapter
 	Modified time.Time
 }
@@ -46,7 +47,6 @@ div p:first-child{text-indent:0;}
 table, th, td { border:2px solid #808080; padding:3px; }
 table { border-collapse:collapse; margin:3px; }
 `
-const lang = "en"
 
 var (
 	re           = regexp.MustCompile("[^A-Za-z0-9.-]+")
@@ -66,7 +66,7 @@ func head(title, style, comment string) *Node {
 }
 
 // Write the ebook into given directory as HTML5 documents.}|
-func Write(info EbookInfo, directory string, cacheDir string) (string, error) {
+func (info *EbookInfo) Write(directory string, cacheDir string) (string, error) {
 	if info.Title == "" {
 		return "", nil
 	}
@@ -77,6 +77,7 @@ func Write(info EbookInfo, directory string, cacheDir string) (string, error) {
 	dstDir := filepath.Join(directory, name)
 	os.MkdirAll(dstDir, 0o755)
 	tocPath := filepath.Join(dstDir, name+".html")
+	informationComment := infocomment(*info)
 	if info.Cover != "" {
 		rc, _, err := GetUrl(info.Cover, cacheDir, "", false)
 		if err == nil {
@@ -87,6 +88,10 @@ func Write(info EbookInfo, directory string, cacheDir string) (string, error) {
 				info.Cover = fn
 			}
 		}
+	}
+	cover, err := filepath.Rel(dstDir, info.Cover)
+	if err != nil {
+		cover = info.Cover
 	}
 	for i, chapter := range info.Chapters {
 		var linkDiv *Node
@@ -113,7 +118,7 @@ func Write(info EbookInfo, directory string, cacheDir string) (string, error) {
 			)
 		}
 		RenderDoc(out,
-			Element("html", map[string]string{"lang": lang},
+			Element("html", map[string]string{"lang": info.Language},
 				head(chapter.Title, bookStyle, comment),
 				Elem("body",
 					Element("h2", map[string]string{"class": "chapter"}, TextNode(chapter.Title)),
@@ -141,11 +146,11 @@ func Write(info EbookInfo, directory string, cacheDir string) (string, error) {
 		return "", err
 	}
 	RenderDoc(out,
-		Element("html", map[string]string{"lang": lang},
-			head(info.Title, bookStyle, infocomment(info)),
+		Element("html", map[string]string{"lang": info.Language},
+			head(info.Title, bookStyle, informationComment),
 			Elem("body",
 				Element("h2", map[string]string{"class": "chapter"}, TextNode(info.Title)),
-				img(info.Cover, "[COVER]"),
+				img(cover, "[COVER]"),
 				Elem("p", p...),
 			),
 		),

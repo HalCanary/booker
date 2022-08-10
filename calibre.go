@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strings"
+	"time"
 )
 
 var newlineRegexp *regexp.Regexp = regexp.MustCompile("\n")
@@ -17,7 +19,9 @@ func EbookConvert(src, dst string, info EbookInfo) error {
 		"--title", info.Title,
 		"--authors", info.Authors,
 		"--cover", info.Cover,
-		"--comments", newlineRegexp.ReplaceAllString(info.Comments, " ¶ "),
+		"--language", info.Language,
+		"--pubdate", info.Modified.Format(time.RFC3339),
+		"--comments", newlineRegexp.ReplaceAllString(strings.TrimSpace(info.Comments), " ¶ "),
 	)
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {

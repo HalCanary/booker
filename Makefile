@@ -20,4 +20,7 @@ DOCUMENTATION.md: $(wildcard *.go)
 
 doc: DOCUMENTATION.md
 
-.PHONY: clean clean-all test all doc
+fmt:
+	gofmt -w *.go
+
+.PHONY: clean clean-all test all doc fmt

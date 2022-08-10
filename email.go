@@ -28,8 +28,9 @@ type EmailSecrets struct {
 
 // Attachment for an email.
 type Attachment struct {
-	Filename string
-	Data     []byte
+	Filename    string
+	ContentType string
+	Data        []byte
 }
 
 // An electric mail message.
@@ -106,8 +107,12 @@ func (mail Email) Make() []byte {
 		quotedprintableWrite(mail.Content, w)
 	}
 	for _, attachment := range mail.Attachments {
+		contentType := attachment.ContentType
+		if contentType == "" {
+			contentType = http.DetectContentType(attachment.Data)
+		}
 		w, _ := mw.CreatePart(textproto.MIMEHeader{
-			"Content-Type":              []string{http.DetectContentType(attachment.Data)},
+			"Content-Type":              []string{contentType},
 			"Content-Transfer-Encoding": []string{"base64"},
 			"Content-Disposition":       []string{contentDisposition(attachment.Filename)},
 			"MIME-Version":              []string{"1.0"},

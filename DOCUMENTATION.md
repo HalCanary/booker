@@ -25,6 +25,10 @@ func GetAttribute(node *Node, key string) string
 func GetUrl(url, cacheDir, ref string, force bool) (io.ReadCloser, string, error)
     Fetch the content of a URL, using a cache if possible and if force is fakse.
 
+func Humanize(v int) string
+    Humanize converts a byte size to a human readable number, for example: 2048
+    -> "2 kB"
+
 func NormalizeString(v string) string
     Simplify and normalize a Unicode string.
 
@@ -34,15 +38,13 @@ func Register(downloadFunction func(url, cachePath string) (EbookInfo, error))
 func RenderDoc(w io.Writer, root *Node) error
     Generates HTML5 doc.
 
-func Write(info EbookInfo, directory string, cacheDir string) (string, error)
-    Write the ebook into given directory as HTML5 documents.}|
-
 
 TYPES
 
 type Attachment struct {
-	Filename string
-	Data     []byte
+	Filename    string
+	ContentType string
+	Data        []byte
 }
     Attachment for an email.
 
@@ -59,6 +61,7 @@ type EbookInfo struct {
 	Comments string
 	Title    string
 	Source   string
+	Language string
 	Chapters []Chapter
 	Modified time.Time
 }
@@ -67,6 +70,9 @@ type EbookInfo struct {
 func Download(url, cachePath string) (EbookInfo, error)
     Return the result of the first registered download function that does not
     return UnsupportedUrlError.
+
+func (info *EbookInfo) Write(directory string, cacheDir string) (string, error)
+    Write the ebook into given directory as HTML5 documents.}|
 
 type Email struct {
 	Date        time.Time
