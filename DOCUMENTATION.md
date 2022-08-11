@@ -39,6 +39,9 @@ func Register(downloadFunction func(url string) (EbookInfo, error))
 func RenderDoc(w io.Writer, root *Node) error
     Generates HTML5 doc.
 
+func SendFile(dst, path, contentType string, secrets EmailSecrets) error
+    Send a file to a single destination.
+
 
 TYPES
 

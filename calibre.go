@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -12,6 +14,7 @@ var newlineRegexp *regexp.Regexp = regexp.MustCompile("\n")
 
 // Call Calibre's `ebook-convert` command with metadata from `info`.
 func EbookConvert(src, dst string, info EbookInfo) error {
+	os.MkdirAll(filepath.Dir(dst), 0o755)
 	cmd := exec.Command(
 		"ebook-convert",
 		src,
