@@ -23,7 +23,7 @@ func ExtractText(root *Node) string
 func GetAttribute(node *Node, key string) string
     Find the matching attributes, ignoring namespace.
 
-func GetUrl(url, cacheDir, ref string, force bool) (io.ReadCloser, string, error)
+func GetUrl(url, ref string, force bool) (io.ReadCloser, error)
     Fetch the content of a URL, using a cache if possible and if force is fakse.
 
 func Humanize(v int) string
@@ -33,7 +33,7 @@ func Humanize(v int) string
 func NormalizeString(v string) string
     Simplify and normalize a Unicode string.
 
-func Register(downloadFunction func(url, cachePath string) (EbookInfo, error))
+func Register(downloadFunction func(url string) (EbookInfo, error))
     Register the given function.
 
 func RenderDoc(w io.Writer, root *Node) error
@@ -69,11 +69,11 @@ type EbookInfo struct {
 }
     Ebook content and metadata.
 
-func Download(url, cachePath string) (EbookInfo, error)
+func Download(url string) (EbookInfo, error)
     Return the result of the first registered download function that does not
     return UnsupportedUrlError.
 
-func (info *EbookInfo) Write(directory string, cacheDir string) (string, error)
+func (info *EbookInfo) Write(directory string) (string, error)
     Write the ebook into given directory as HTML5 documents.}|
 
 type Email struct {

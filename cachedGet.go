@@ -7,8 +7,10 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"sync"
 )
 
 func exists(path string) bool {
@@ -21,16 +23,26 @@ const (
 	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36"
 )
 
+var (
+	cacheDirOnce sync.Once
+	cacheDir     string
+)
+
 // Fetch the content of a URL, using a cache if possible and if force is fakse.
-func GetUrl(url, cacheDir, ref string, force bool) (io.ReadCloser, string, error) {
+func GetUrl(url, ref string, force bool) (io.ReadCloser, error) {
+	cacheDirOnce.Do(func() {
+		cache, err := os.UserCacheDir()
+		if err != nil {
+			log.Fatal(err)
+		}
+		cacheDir = cache + "/urlcache"
+	})
 	uhashbytes := md5.Sum([]byte(url))
 	uhash := hex.EncodeToString(uhashbytes[:])
 	cache := cacheDir + "/" + uhash
-	tcache := cacheDir + "/" + uhash + "_type"
-	var contentType string
-	if force || !exists(cache) || !exists(tcache) {
+	if force || !exists(cache) {
 		if err := os.MkdirAll(cacheDir, 0o755); err != nil {
-			return nil, "", err
+			return nil, err
 		}
 		req, err := http.NewRequest("GET", url, nil)
 		if ref != "" {
@@ -43,30 +55,22 @@ func GetUrl(url, cacheDir, ref string, force bool) (io.ReadCloser, string, error
 		client := http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
-			return nil, "", err
+			return nil, err
 		}
-		contentType = resp.Header.Get("Content-Type")
-		if err = os.WriteFile(tcache, []byte(contentType), 0o644); err != nil {
-			return nil, "", err
+		if err = os.WriteFile(cacheDir+"/"+uhash+"_type",
+			[]byte(resp.Header.Get("Content-Type")), 0o644); err != nil {
+			return nil, err
 		}
 		bodyWriter, err := os.Create(cache)
 		if err != nil {
-			return nil, "", err
+			return nil, err
 		}
 		_, err = io.Copy(bodyWriter, resp.Body)
 		if err != nil {
-			return nil, "", err
+			return nil, err
 		}
 		resp.Body.Close()
 		bodyWriter.Close()
 	}
-	if contentType == "" {
-		typeBytes, err := os.ReadFile(tcache)
-		if err != nil {
-			return nil, "", err
-		}
-		contentType = string(typeBytes)
-	}
-	body, err := os.Open(cache)
-	return body, contentType, err
+	return os.Open(cache)
 }

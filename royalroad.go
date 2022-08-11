@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	Register(func(mainUrl string, cachePath string) (EbookInfo, error) {
+	Register(func(mainUrl string) (EbookInfo, error) {
 		var info EbookInfo
 		mainUrlUrl, err := url.Parse(mainUrl)
 		if err != nil {
@@ -20,7 +20,7 @@ func init() {
 		if mainUrlUrl.Host != "www.royalroad.com" {
 			return info, UnsupportedUrlError
 		}
-		main, _, err := GetUrl(mainUrl, cachePath, "", true)
+		main, err := GetUrl(mainUrl, "", true)
 		if err != nil {
 			return info, err
 		}
@@ -66,7 +66,7 @@ func init() {
 		log.Printf("%q -> discovered %d chapters (%s)\n", info.Title, len(info.Chapters), info.Modified)
 		for i, chapter := range info.Chapters {
 			os.Stderr.Write([]byte{'.'})
-			chData, _, err := GetUrl(chapter.Url, cachePath, mainUrl, false)
+			chData, err := GetUrl(chapter.Url, mainUrl, false)
 			if err != nil {
 				return info, err
 			}

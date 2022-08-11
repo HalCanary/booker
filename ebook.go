@@ -110,8 +110,8 @@ func writeChapter(path string, chapter Chapter, language string, last bool) erro
 	)
 }
 
-func getCover(url, dst, cacheDir string) error {
-	rc, _, err := GetUrl(url, cacheDir, "", false)
+func getCover(url, dst string) error {
+	rc, err := GetUrl(url, "", false)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func bookName(info EbookInfo) string {
 }
 
 // Write the ebook into given directory as HTML5 documents.}|
-func (info *EbookInfo) Write(directory string, cacheDir string) (string, error) {
+func (info *EbookInfo) Write(directory string) (string, error) {
 	if info.Title == "" {
 		return "", errors.New("title missing")
 	}
@@ -147,7 +147,7 @@ func (info *EbookInfo) Write(directory string, cacheDir string) (string, error) 
 	}
 	if info.CoverURL != "" && info.CoverPath == "" {
 		fn := filepath.Join(dstDir, name+".jpg")
-		err := getCover(info.CoverURL, fn, cacheDir)
+		err := getCover(info.CoverURL, fn)
 		if err != nil {
 			log.Printf("error: %v", err)
 		} else {
@@ -162,7 +162,7 @@ func (info *EbookInfo) Write(directory string, cacheDir string) (string, error) 
 	if exists(dst) {
 		return dst, BookAlreadyExists
 	}
-	err := writeBook(*info, dst, cacheDir)
+	err := writeBook(*info, dst)
 	if err != nil {
 		os.RemoveAll(dstDir)
 		return "", err
@@ -198,7 +198,7 @@ func filepathRel(basepath, targpath string) string {
 	return result
 }
 
-func writeBook(info EbookInfo, tocPath, cacheDir string) error {
+func writeBook(info EbookInfo, tocPath string) error {
 	dstDir := filepath.Dir(tocPath)
 	for i, chapter := range info.Chapters {
 		path := chapterPath(dstDir, i)

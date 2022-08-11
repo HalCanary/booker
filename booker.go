@@ -38,13 +38,11 @@ func main() {
 		address = strings.TrimSpace(string(addressData))
 	}
 
-	var cache = "../cache" // filepath.Join(os.UserCacheDir(), "download")
-
 	for _, arg := range flag.Args() {
-		bk, err := Download(arg, cache)
+		bk, err := Download(arg)
 		check(err)
 
-		path, err := bk.Write("./dst", cache)
+		path, err := bk.Write("./dst")
 		if err == BookAlreadyExists {
 			log.Printf("%q already exists.\n", path)
 		} else {
