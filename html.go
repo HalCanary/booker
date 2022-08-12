@@ -46,6 +46,10 @@ func Element(tag string, attributes map[string]string, children ...*Node) *Node 
 	return node
 }
 
+func AddAttribute(node *Node, key, value string) {
+	node.Attr = append(node.Attr, html.Attribute{Key: key, Val: value})
+}
+
 // Return an element with the given children.
 func Elem(tag string, children ...*Node) *Node {
 	return Element(tag, nil, children...)

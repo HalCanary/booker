@@ -11,6 +11,7 @@ var UnsupportedUrlError = errors.New("unsupported url")
 
 FUNCTIONS
 
+func AddAttribute(node *Node, key, value string)
 func CalculateLastModified(chapters []Chapter) time.Time
     Return the time of most recently modified chapter.
 
