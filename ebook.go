@@ -1,14 +1,13 @@
 package main
 
 import (
-	"errors"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"os"
-	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -33,6 +32,30 @@ type EbookInfo struct {
 	Modified  time.Time
 }
 
+var (
+	re           = regexp.MustCompile("[^A-Za-z0-9.-]+")
+	whitespaceRe = regexp.MustCompile("\\s+")
+	stripRe      = regexp.MustCompile("(?:^\\s+)|(?:\\s+$)")
+)
+
+const bookStyle = `
+div p{text-indent:2em;margin-top:0;margin-bottom:0}
+div p:first-child{text-indent:0;}
+table, th, td { border:2px solid #808080; padding:3px; }
+table { border-collapse:collapse; margin:3px; }
+ol.flat {list-style-type:none;}
+ol.flat li {list-style:none; display:inline;}
+ol.flat li::after {content:"]";}
+ol.flat li::before {content:"[";}
+`
+
+const conatainer_xml = xml.Header + `<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+<rootfiles>
+<rootfile full-path="book/content.opf" media-type="application/oebps-package+xml"/>
+</rootfiles>
+</container>
+`
+
 // Return the time of most recently modified chapter.
 func CalculateLastModified(chapters []Chapter) time.Time {
 	var result time.Time
@@ -44,22 +67,10 @@ func CalculateLastModified(chapters []Chapter) time.Time {
 	return result
 }
 
-const bookStyle = `
-div p{text-indent:2em;margin-top:0;margin-bottom:0}
-div p:first-child{text-indent:0;}
-table, th, td { border:2px solid #808080; padding:3px; }
-table { border-collapse:collapse; margin:3px; }
-`
-
-var (
-	re           = regexp.MustCompile("[^A-Za-z0-9.-]+")
-	whitespaceRe = regexp.MustCompile("\\s+")
-	stripRe      = regexp.MustCompile("(?:^\\s+)|(?:\\s+$)")
-)
-
 func head(title, style, comment string) *Node {
 	return Elem("head",
-		Element("meta", map[string]string{"charset": "utf-8"}),
+		Element("meta", map[string]string{
+			"http-equiv": "Content-Type", "content": "text/html; charset=utf-8"}),
 		Comment(comment),
 		Element("meta", map[string]string{
 			"name": "viewport", "content": "width=device-width, initial-scale=1.0"}),
@@ -68,160 +79,148 @@ func head(title, style, comment string) *Node {
 	)
 }
 
-var BookAlreadyExists = errors.New("Book Already Exists")
-
-func writeChapter(path string, chapter Chapter, language string, last bool) error {
+func writeDocument(path string, htmlNode *Node) error {
 	out, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
-
-	var linkDiv *Node
-	if last {
-		linkDiv = Elem("div",
-			link(chapter.Url, chapter.Url),
-			Elem("hr"),
-		)
-	}
-	comment := ""
-	if chapter.Url != "" {
-		comment = fmt.Sprintf("\n%s\n", chapter.Url)
-	}
-
-	var modified *Node
-	if !chapter.Modified.IsZero() {
-		modified = Elem("div",
-			Elem("p", Elem("em", TextNode(chapter.Modified.Format("2006-01-02")))),
-			Elem("hr"),
-		)
-	}
-	return RenderDoc(out,
-		Element("html", map[string]string{"lang": language},
-			head(chapter.Title, bookStyle, comment),
-			Elem("body",
-				Element("h2", map[string]string{"class": "chapter"}, TextNode(chapter.Title)),
-				modified,
-				chapter.Content,
-				Elem("hr"),
-				linkDiv,
-			),
-		),
-	)
+	return RenderXHTMLDoc(out, htmlNode)
 }
 
-func getCover(url, dst string) error {
-	rc, err := GetUrl(url, "", false)
-	if err != nil {
-		return err
-	}
-	src, _ := io.ReadAll(rc)
-	rc.Close()
-	jpeg, err := saveJpegWithScale(src, 400, 600)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(dst, jpeg, 0o644); err != nil {
-		return err
-	}
-	return nil
-}
-
-func bookName(info EbookInfo) string {
+func (info EbookInfo) Name() string {
 	name := re.ReplaceAllString(NormalizeString(info.Title), "_")
 	if info.Modified.IsZero() {
 		return name
 	}
-	return name + info.Modified.Format("_2006-01-02_150405")
+	return name + info.Modified.UTC().Format("_2006-01-02_150405")
 }
 
-// Write the ebook into given directory as HTML5 documents.}|
-func (info *EbookInfo) Write(directory string) (string, error) {
-	if info.Title == "" {
-		return "", errors.New("title missing")
-	}
-	name := bookName(*info)
-	dstDir := filepath.Join(directory, name)
-	if err := os.MkdirAll(dstDir, 0o755); err != nil {
-		return "", err
-	}
-	if info.CoverURL != "" && info.CoverPath == "" {
-		fn := filepath.Join(dstDir, name+".jpg")
-		err := getCover(info.CoverURL, fn)
+// Write the ebook as an Epub.
+func (info EbookInfo) Write(dst io.Writer) error {
+	var (
+		uid      string = randomUUID()
+		jpegData []byte
+		cover    string
+	)
+	if info.CoverURL != "" {
+		rc, err := GetUrl(info.CoverURL, "", false)
 		if err != nil {
 			log.Printf("error: %v", err)
 		} else {
-			info.CoverPath, err = filepath.Abs(fn)
+			src, _ := io.ReadAll(rc)
+			rc.Close()
+			jpegData, err = saveJpegWithScale(src, 400, 600)
 			if err != nil {
 				log.Printf("error: %v", err)
-				info.CoverPath = ""
+			} else {
+				cover = "cover.jpg"
 			}
 		}
 	}
-	dst := filepath.Join(dstDir, name+".html")
-	if exists(dst) {
-		return dst, BookAlreadyExists
-	}
-	err := writeBook(*info, dst)
-	if err != nil {
-		os.RemoveAll(dstDir)
-		return "", err
-	}
-	return dst, nil
-}
 
-func makeChapterLinks(chapters []Chapter) *Node {
-	p := Elem("p")
-	p.AppendChild(TextNode("\n| "))
-	for i, chapter := range chapters {
-		p.AppendChild(link(chapterPath(".", i), chapter.Title))
-		p.AppendChild(TextNode("\n| "))
-	}
-	return p
-}
+	zw := MakeZipper(dst)
+	defer zw.Close()
 
-func filepathRel(basepath, targpath string) string {
-	if targpath == "" {
-		return ""
+	if w := zw.CreateStore("mimetype", info.Modified); w != nil {
+		_, zw.Error = w.Write([]byte("application/epub+zip"))
 	}
-	var err error
-	basepath, err = filepath.Abs(basepath)
-	if err != nil {
-		log.Printf("error: %s\n", err)
-		return ""
+	if w := zw.CreateDeflate("META-INF/container.xml", info.Modified); w != nil {
+		_, zw.Error = w.Write([]byte(conatainer_xml))
 	}
-	result, err := filepath.Rel(basepath, targpath)
-	if err != nil {
-		log.Printf("error: %s\n", err)
-		return ""
+	if w := zw.CreateDeflate("book/toc.ncx", info.Modified); w != nil {
+		zw.Error = makeNCX(info, uid, w)
 	}
-	return result
-}
-
-func writeBook(info EbookInfo, tocPath string) error {
-	dstDir := filepath.Dir(tocPath)
-	for i, chapter := range info.Chapters {
-		path := chapterPath(dstDir, i)
-		last := i+1 == len(info.Chapters)
-		if err := writeChapter(path, chapter, info.Language, last); err != nil {
-			return err
+	if w := zw.CreateDeflate("book/content.opf", info.Modified); w != nil {
+		zw.Error = makePackage(info, uid, w, cover)
+	}
+	if w := zw.CreateDeflate("book/frontmatter.xhtml", info.Modified); w != nil {
+		zw.Error = writeFrontmatter(info, w, cover)
+	}
+	if w := zw.CreateDeflate("book/toc.xhtml", info.Modified); w != nil {
+		zw.Error = writeToc(info, w)
+	}
+	if cover != "" {
+		if w := zw.CreateStore("book/"+cover, info.Modified); w != nil {
+			_, zw.Error = w.Write(jpegData)
 		}
 	}
-	out, err := os.Create(tocPath)
-	if err != nil {
-		return err
+	for i, chapter := range info.Chapters {
+		if w := zw.CreateDeflate(fmt.Sprintf("book/%04d.xhtml", i), chapter.Modified); w != nil {
+			var churl string
+			if i+1 == len(info.Chapters) {
+				churl = chapter.Url
+			}
+			zw.Error = writeChapter(chapter, churl, info.Language, w)
+		}
 	}
-	defer out.Close()
-	return RenderDoc(out,
-		Element("html", map[string]string{"lang": info.Language},
-			head(info.Title, bookStyle, infoComment(info)),
-			Elem("body",
-				Element("h2", map[string]string{"class": "chapter"}, TextNode(info.Title)),
-				img(filepathRel(dstDir, info.CoverPath), "[COVER]"),
-				makeChapterLinks(info.Chapters),
-			),
+	return zw.Error
+}
+
+func writeFrontmatter(info EbookInfo, dst io.Writer, cover string) error {
+	description := Elem("div")
+	for _, p := range strings.Split(info.Comments, "\n\n") {
+		pnode := Elem("p")
+		for i, c := range strings.Split(p, "\n\n") {
+			if i > 0 {
+				pnode.AppendChild(Elem("br"))
+			}
+			pnode.AppendChild(TextNode(c))
+		}
+		description.AppendChild(pnode)
+	}
+	htmlNode := Element("html", map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": info.Language},
+		head(info.Title, bookStyle, ""),
+		Elem("body",
+			Elem("h1", TextNode(info.Title)),
+			img(cover, "[COVER]"),
+			Elem("div", TextNode(info.Authors)),
+			Elem("div", TextNode(info.Source)),
+			Elem("div", Elem("em", TextNode(info.Modified.Format("2006-01-02")))),
+			description,
 		),
 	)
+	return RenderXHTMLDoc(dst, htmlNode)
+}
+
+func writeChapter(chapter Chapter, url, lang string, dst io.Writer) error {
+	body := Elem("body")
+	if chapter.Url != "" {
+		Append(body, Comment(fmt.Sprintf("\n%s\n", chapter.Url)))
+	}
+	Append(body, Element("h2", map[string]string{"class": "chapter"}, TextNode(chapter.Title)))
+	if !chapter.Modified.IsZero() {
+		Append(body, Elem("p", Elem("em", TextNode(chapter.Modified.Format("2006-01-02")))))
+	}
+	Append(body, Elem("hr"), chapter.Content, Elem("hr"))
+	if url != "" {
+		Append(body, Elem("div", link(url, url)), Elem("hr"))
+	}
+	return RenderXHTMLDoc(dst, Element("html",
+		map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": lang},
+		head(chapter.Title, bookStyle, ""),
+		body,
+	))
+}
+
+func writeToc(info EbookInfo, dst io.Writer) error {
+	links := Element("ol", map[string]string{"class": "flat"})
+	for i, ch := range info.Chapters {
+		label := fmt.Sprintf("%d. %s", i+1, ch.Title)
+		Append(links, Elem("li", link(fmt.Sprintf("%04d.xhtml", i), label)))
+	}
+	htmlNode := Element("html",
+		map[string]string{
+			"xmlns":      "http://www.w3.org/1999/xhtml",
+			"xml:lang":   info.Language,
+			"xmlns:epub": "http://www.idpf.org/2007/ops",
+		},
+		head(info.Title, bookStyle, ""),
+		Elem("body",
+			Element("nav", map[string]string{"epub:type": "toc"}, Elem("h2", TextNode("Contents")), links),
+		),
+	)
+	return RenderXHTMLDoc(dst, htmlNode)
 }
 
 func link(url, text string) *Node {
@@ -238,34 +237,8 @@ func img(url, alt string) *Node {
 	return Element("img", map[string]string{"src": url, "alt": alt})
 }
 
-func chapterPath(dir string, i int) string { return fmt.Sprintf("%s/%04d.html", dir, i) }
-
-func wsb(builder *strings.Builder, strs ...string) {
-	for _, s := range strs {
-		builder.WriteString(s)
-	}
-}
-
-func infoComment(info EbookInfo) string {
-	var builder strings.Builder
-	builder.WriteString("\n\n")
-	modified := ""
-	if !info.Modified.IsZero() {
-		modified = info.Modified.Format(time.RFC3339)
-	}
-	for _, v := range [][2]string{
-		{"src", info.Source},
-		{"title", info.Title},
-		{"authors", info.Authors},
-		{"chapter_count", strconv.Itoa(len(info.Chapters))},
-		{"cover", info.CoverURL},
-		{"last_modified", modified},
-		{"comments", info.Comments},
-	} {
-		if v[1] != "" {
-			wsb(&builder, v[0], ": ", v[1], "\n")
-		}
-	}
-	builder.WriteString("\n")
-	return builder.String()
+func randomUUID() string {
+	var v [16]byte
+	rand.Read(v[:])
+	return fmt.Sprintf("%x-%x-%x-%x-%x", v[0:4], v[4:6], v[6:8], v[8:10], v[10:16])
 }

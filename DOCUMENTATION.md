@@ -4,14 +4,13 @@ LICENSE.
 
 VARIABLES
 
-var BookAlreadyExists = errors.New("Book Already Exists")
 var UnsupportedUrlError = errors.New("unsupported url")
     Returned by a downloadFunction when the URL can not be handled.
 
 
 FUNCTIONS
 
-func AddAttribute(node *Node, key, value string)
+func AddAttribute(node *Node, k, v string)
 func CalculateLastModified(chapters []Chapter) time.Time
     Return the time of most recently modified chapter.
 
@@ -39,6 +38,9 @@ func Register(downloadFunction func(url string) (EbookInfo, error))
 
 func RenderDoc(w io.Writer, root *Node) error
     Generates HTML5 doc.
+
+func RenderXHTMLDoc(w io.Writer, root *Node) error
+    Generates XHTML1 doc.
 
 func SendFile(dst, path, contentType string, secrets EmailSecrets) error
     Send a file to a single destination.
@@ -77,8 +79,10 @@ func Download(url string) (EbookInfo, error)
     Return the result of the first registered download function that does not
     return UnsupportedUrlError.
 
-func (info *EbookInfo) Write(directory string) (string, error)
-    Write the ebook into given directory as HTML5 documents.}|
+func (info EbookInfo) Name() string
+
+func (info EbookInfo) Write(dst io.Writer) error
+    Write the ebook as an Epub.
 
 type Email struct {
 	Date        time.Time
@@ -114,6 +118,8 @@ func GetSecrets(path string) (EmailSecrets, error)
 
 type Node = html.Node
 
+func Append(node *Node, children ...*Node) *Node
+
 func Cleanup(node *Node) *Node
     Clean up a HTML fragment.
 
@@ -131,5 +137,18 @@ func Remove(node *Node) *Node
 
 func TextNode(data string) *Node
     Return a HTML node with the given text.
+
+type Zipper struct {
+	ZipWriter *zip.Writer
+	Error     error
+}
+
+func MakeZipper(dst io.Writer) Zipper
+
+func (zw *Zipper) Close()
+
+func (zw *Zipper) CreateDeflate(name string, mod time.Time) io.Writer
+
+func (zw *Zipper) CreateStore(name string, mod time.Time) io.Writer
 
 ```

@@ -3,13 +3,13 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 func check(err error) {
@@ -20,8 +20,12 @@ func check(err error) {
 }
 
 func main() {
-	var send bool
+	var (
+		send      bool
+		overwrite bool
+	)
 	flag.BoolVar(&send, "send", false, "also send via email")
+	flag.BoolVar(&overwrite, "over", false, "force overwritr")
 	flag.Parse()
 
 	homeDir, err := os.UserHomeDir()
@@ -38,36 +42,32 @@ func main() {
 		address = strings.TrimSpace(string(addressData))
 	}
 
-	destination := filepath.Join(homeDir, "ebooks/html")
-	epubDestination := filepath.Join(homeDir, "ebooks/epub")
+	destination := filepath.Join(homeDir, "ebooks")
+	check(os.MkdirAll(destination, 0o755))
 
 	for _, arg := range flag.Args() {
 		bk, err := Download(arg)
 		check(err)
 
-		path, err := bk.Write(destination)
-		if err == BookAlreadyExists {
+		name := bk.Name()
+		if name == "" {
+			check(errors.New("no name :("))
+		}
+		path := filepath.Join(destination, name+".epub")
+
+		if !overwrite && exists(path) {
 			log.Printf("%q already exists.\n", path)
-		} else {
-			check(err)
-			log.Println(path)
+			continue
 		}
+		f, err := os.Create(path)
+		check(err)
+		defer f.Close()
 
-		basename := filepath.Base(path)
-		epubPath := filepath.Join(epubDestination,
-			basename[:len(basename)-len(filepath.Ext(basename))]+".epub")
-
-		if !exists(epubPath) {
-			start := time.Now()
-			err = EbookConvert(path, epubPath, bk)
-			check(err)
-			log.Printf("EbookConvert took %s\n", time.Now().Sub(start))
-		}
-		log.Println(epubPath)
+		check(bk.Write(f))
+		log.Printf("%q writtern\n", path)
 
 		if send {
-			err = SendFile(address, epubPath, "application/epub+zip", secrets)
-			check(err)
+			check(SendFile(address, path, "application/epub+zip", secrets))
 			log.Printf("Send message to %q.", address)
 		}
 	}
