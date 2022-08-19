@@ -108,21 +108,45 @@ func (w *checkedWriter) Write(b []byte) {
 	}
 }
 
+var xhtmlattribs = map[string]struct{}{
+	"alt":        struct{}{},
+	"border":     struct{}{},
+	"class":      struct{}{},
+	"content":    struct{}{},
+	"dir":        struct{}{},
+	"href":       struct{}{},
+	"http-equiv": struct{}{},
+	"id":         struct{}{},
+	"lang":       struct{}{},
+	"name":       struct{}{},
+	"src":        struct{}{},
+	"style":      struct{}{},
+	"title":      struct{}{},
+	"type":       struct{}{},
+	"xmlns":      struct{}{},
+}
+
 func renderXHTML(w *checkedWriter, node *Node) {
 	switch node.Type {
 	case html.ElementNode:
 		w.Write([]byte{'<'})
 		w.Write([]byte(node.Data))
 		for _, attr := range node.Attr {
-			w.Write([]byte{' '})
-			if attr.Namespace != "" {
-				w.Write([]byte(attr.Namespace))
-				w.Write([]byte{':'})
+			ok := attr.Namespace != ""
+			if !ok {
+				_, ok = xhtmlattribs[attr.Key]
 			}
-			w.Write([]byte(attr.Key))
-			w.Write([]byte{'=', '"'})
-			w.Write([]byte(html.EscapeString(attr.Val)))
-			w.Write([]byte{'"'})
+			if ok {
+				w.Write([]byte{' '})
+				if attr.Namespace != "" {
+					w.Write([]byte(attr.Namespace))
+					w.Write([]byte{':'})
+				}
+				w.Write([]byte(attr.Key))
+				w.Write([]byte{'=', '"'})
+				w.Write([]byte(html.EscapeString(attr.Val)))
+				w.Write([]byte{'"'})
+			}
 		}
 		if node.FirstChild == nil {
 			w.Write([]byte{'/', '>'})

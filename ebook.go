@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -53,7 +54,7 @@ div p{text-indent:2em;margin-top:0;margin-bottom:0}
 div p:first-child{text-indent:0;}
 table, th, td { border:2px solid #808080; padding:3px; }
 table { border-collapse:collapse; margin:3px; }
-nav ul li { list-style: none; }
+nav ol li { list-style: none; }
 `
 
 var (
@@ -171,36 +172,56 @@ func (info *EbookInfo) Write(directory string) (string, error) {
 	zw := zip.NewWriter(zfile)
 
 	zipRaw(zw, "mimetype", []byte("application/epub+zip"))
-	zipFile(zw, "META-INF/container.xml", filepath.Join(dstDir, "META-INF/container.xml"))
-	zipFile(zw, "content.opf", filepath.Join(dstDir, "content.opf"))
-	zipFile(zw, "cover.xhtml", filepath.Join(dstDir, "cover.xhtml"))
-	zipFile(zw, "toc.xhtml", filepath.Join(dstDir, "toc.xhtml"))
-
+	files := []string{
+		"META-INF/container.xml",
+		"toc.ncx",
+		"content.opf",
+		"frontmatter.xhtml",
+		"toc.xhtml",
+	}
 	if info.CoverPath != "" {
-		zipFile(zw, "cover.jpg", filepath.Join(dstDir, "cover.jpg"))
+		files = append(files, "cover.jpg")
 	}
 	for i, _ := range info.Chapters {
-		p := fmt.Sprintf("%04d.xhtml", i)
-		zipFile(zw, p, filepath.Join(dstDir, p))
+		files = append(files, fmt.Sprintf("%04d.xhtml", i))
 	}
+	for _, f := range files {
+		err := zipFile(zw, f, dstDir)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	zw.Close()
 	return zpath, nil
 }
 
-func zipFile(zw *zip.Writer, name, path string) {
-	w, _ := zw.Create(name)
-	f, _ := os.Open(path)
-	_, _ = io.Copy(w, f)
+func zipFile(zw *zip.Writer, name, dir string) error {
+	w, err := zw.Create(name)
+	if err != nil {
+		return err
+	}
+	f, err := os.Open(filepath.Join(dir, name))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(w, f)
+	return err
 }
 
-func zipRaw(zw *zip.Writer, name string, data []byte) {
-	w, _ := zw.CreateRaw(&zip.FileHeader{
+func zipRaw(zw *zip.Writer, name string, data []byte) error {
+	w, err := zw.CreateRaw(&zip.FileHeader{
 		Name:               name,
 		CompressedSize64:   uint64(len(data)),
 		UncompressedSize64: uint64(len(data)),
 		CRC32:              crc32.ChecksumIEEE(data),
 	})
-	w.Write(data)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(data)
+	return err
 }
 
 func filepathRel(basepath, targpath string) string {
@@ -253,15 +274,15 @@ func writeCover(info EbookInfo, dstDir string) error {
 			description,
 		),
 	)
-	return writeDocument(filepath.Join(dstDir, "cover.xhtml"), htmlNode)
+	return writeDocument(filepath.Join(dstDir, "frontmatter.xhtml"), htmlNode)
 }
 
 func writeToc(info EbookInfo, dstDir string) error {
-	links := Elem("ul")
+	links := Elem("ol")
 	for i, chapter := range info.Chapters {
 		chapterFile := fmt.Sprintf("%s/%04d.xhtml", dstDir, i)
 		Append(links,
-			Element("li", map[string]string{"style": "list-style: none"}, link(filepathRel(dstDir, chapterFile), chapter.Title)))
+			Elem("li", link(filepathRel(dstDir, chapterFile), chapter.Title)))
 		htmlNode := Element("html", map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": info.Language},
 			head(chapter.Title, bookStyle, ""),
 			makeChapter(chapter, i+1 == len(info.Chapters)),
@@ -270,8 +291,12 @@ func writeToc(info EbookInfo, dstDir string) error {
 			return err
 		}
 	}
-	htmlNode := Element("html", map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": info.Language},
-		//head(info.Title, bookStyle, infoComment(info)),
+	htmlNode := Element("html",
+		map[string]string{
+			"xmlns":      "http://www.w3.org/1999/xhtml",
+			"xml:lang":   info.Language,
+			"xmlns:epub": "http://www.idpf.org/2007/ops",
+		},
 		head(info.Title, bookStyle, ""),
 		Elem("body",
 			Element("h2", map[string]string{"class": "chapter"}, TextNode(info.Title)),
@@ -289,7 +314,11 @@ func writeBook(info EbookInfo, dstDir string) error {
 	if err := os.WriteFile(filepath.Join(dstDir, "META-INF/container.xml"), []byte(conatainer_xml), 0o644); err != nil {
 		return err
 	}
-	if err := makePackage(info, filepath.Join(dstDir, "content.opf")); err != nil {
+	uid := randomUUID()
+	if err := makeNCX(info, uid, filepath.Join(dstDir, "toc.ncx")); err != nil {
+		return err
+	}
+	if err := makePackage(info, uid, filepath.Join(dstDir, "content.opf")); err != nil {
 		return err
 	}
 	if err := writeCover(info, dstDir); err != nil {
@@ -348,24 +377,29 @@ func randomUUID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", v[0:4], v[4:6], v[6:8], v[8:10], v[10:16])
 }
 
-func makePackage(info EbookInfo, dst string) error {
+func makePackage(info EbookInfo, uuid, dst string) error {
 	cover := filepath.Base(info.CoverPath)
 	manifestItems := []xmlItem{
-		xmlItem{Id: "cover.xhtml", Href: "cover.xhtml", MediaType: "application/xhtml+xml"},
-		xmlItem{Id: "toc.xhtml", Href: "toc.xhtml", MediaType: "application/xhtml+xml", Properties: "nav"},
+		xmlItem{Id: "frontmatter", Href: "frontmatter.xhtml", MediaType: "application/xhtml+xml"},
+		xmlItem{Id: "toc", Href: "toc.xhtml", MediaType: "application/xhtml+xml",
+			Attributes: []xml.Attr{xml.Attr{Name: xml.Name{Local: "properties"}, Value: "nav"}}},
+		xmlItem{Id: "ncx", Href: "toc.ncx", MediaType: "application/x-dtbncx+xml"},
 	}
 	itemrefs := []xmlItemref{
-		xmlItemref{Idref: "cover.xhtml"},
-		xmlItemref{Idref: "toc.xhtml"},
+		xmlItemref{Idref: "frontmatter"},
+		xmlItemref{Idref: "toc"},
 	}
 	if cover != "" {
-		manifestItems = append(manifestItems, xmlItem{Id: cover, Href: cover, MediaType: "image/jpeg", Properties: "cover-image"})
+		manifestItems = append(manifestItems, xmlItem{Id: cover, Href: cover, MediaType: "image/jpeg",
+			Attributes: []xml.Attr{xml.Attr{Name: xml.Name{Local: "properties"}, Value: "cover-image"}}})
 	}
 	for i, _ := range info.Chapters {
-		fn := fmt.Sprintf("%04d.xhtml", i)
-		manifestItems = append(manifestItems, xmlItem{Id: fn, Href: fn, MediaType: "application/xhtml+xml"})
-		itemrefs = append(itemrefs, xmlItemref{Idref: fn})
+		fn := fmt.Sprintf("%04d", i)
+		id := "ch" + fn
+		manifestItems = append(manifestItems, xmlItem{Id: id, Href: fn + ".xhtml", MediaType: "application/xhtml+xml"})
+		itemrefs = append(itemrefs, xmlItemref{Idref: id})
 	}
+	modified := info.Modified.UTC().Format("2006-01-02T15:04:05Z")
 	p := xmlPackage{
 		Xmlns:            "http://www.idpf.org/2007/opf",
 		XmlnsOpf:         "http://www.idpf.org/2007/opf",
@@ -374,10 +408,14 @@ func makePackage(info EbookInfo, dst string) error {
 		Metadata: xmlMetaData{
 			XmlnsDC: "http://purl.org/dc/elements/1.1/",
 			Properties: []xmlMetaProperty{
-				xmlMetaProperty{Property: "dcterms:modified", Value: info.Modified.Format(time.RFC3339)},
+				xmlMetaProperty{Property: "dcterms:modified", Value: modified},
 			},
 			MetaItems: []xmlMetaItems{
-				xmlMetaItems{XMLName: xml.Name{Local: "dc:identifier"}, Value: randomUUID()},
+				xmlMetaItems{
+					XMLName:    xml.Name{Local: "dc:identifier"},
+					Value:      uuid,
+					Attributes: []xml.Attr{xml.Attr{Name: xml.Name{Local: "id"}, Value: "BookID"}},
+				},
 				xmlMetaItems{XMLName: xml.Name{Local: "dc:title"}, Value: info.Title},
 				xmlMetaItems{XMLName: xml.Name{Local: "dc:language"}, Value: info.Language},
 				xmlMetaItems{XMLName: xml.Name{Local: "dc:creator"}, Value: info.Authors},
@@ -390,18 +428,27 @@ func makePackage(info EbookInfo, dst string) error {
 			Itemrefs: itemrefs,
 		},
 		GuideRefs: []xmlGuideReference{
-			xmlGuideReference{Title: "Cover page", Type: "cover", Href: "cover.xhtml"},
+			xmlGuideReference{Title: "Cover page", Type: "cover", Href: "frontmatter.xhtml"},
 			xmlGuideReference{Title: "Table of content", Type: "toc", Href: "toc.xhtml"},
 		},
 	}
-	f, err := os.Create(dst)
+	encoded, err := xml.MarshalIndent(&p, "", " ")
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	f.Write([]byte(xml.Header))
-	enc := xml.NewEncoder(f)
-	return enc.Encode(&p)
+	encoded = bytes.ReplaceAll(encoded, []byte("></item>"), []byte("/>"))
+	encoded = bytes.ReplaceAll(encoded, []byte("></itemref>"), []byte("/>"))
+	encoded = bytes.ReplaceAll(encoded, []byte("></reference>"), []byte("/>"))
+	return os.WriteFile(dst, encoded, 0o644)
+	// 	f, err := os.Create(dst)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	defer f.Close()
+	// 	f.Write([]byte(xml.Header))
+	// 	enc := xml.NewEncoder(f)
+	// 	enc.Indent("", " ")
+	// 	return enc.Encode(&p)
 }
 
 type xmlPackage struct {
@@ -423,8 +470,9 @@ type xmlMetaData struct {
 }
 
 type xmlMetaItems struct {
-	XMLName xml.Name
-	Value   string `xml:",chardata"`
+	XMLName    xml.Name
+	Value      string     `xml:",chardata"`
+	Attributes []xml.Attr `xml:",attr,any"`
 }
 
 type xmlMetaProperty struct {
@@ -433,10 +481,10 @@ type xmlMetaProperty struct {
 }
 
 type xmlItem struct {
-	Id         string `xml:"id,attr"`
-	Href       string `xml:"href,attr"`
-	MediaType  string `xml:"media-type,attr"`
-	Properties string `xml:"properties,omitempy,attr"`
+	Id         string     `xml:"id,attr"`
+	Href       string     `xml:"href,attr"`
+	MediaType  string     `xml:"media-type,attr"`
+	Attributes []xml.Attr `xml:",attr,any"`
 }
 
 type xmlSpine struct {
@@ -452,4 +500,86 @@ type xmlGuideReference struct {
 	Title string `xml:"title,attr"`
 	Type  string `xml:"type,attr"`
 	Href  string `xml:"href,attr"`
+}
+
+//////
+// <?xml version="1.0" encoding="UTF-8"?>
+// <!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN"
+// "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd">
+// <ncx version="2005-1" xml:lang="en" xmlns="http://www.daisy.org/z3986/2005/ncx/">
+//   <head>
+//     <meta name="dtb:uid" content="123456789X"/> <!-- same as in .opf -->
+//     <meta name="dtb:depth" content="1"/> <!-- 1 or higher -->
+//     <meta name="dtb:totalPageCount" content="0"/> <!-- must be 0 -->
+//     <meta name="dtb:maxPageNumber" content="0"/> <!-- must be 0 -->
+//   </head>
+//   <docTitle>
+//     <text>Pride and Prejudice</text>
+//   </docTitle>
+//   <docAuthor>
+//     <text>Austen, Jane</text>
+//   </docAuthor>
+//   <navMap>
+//     <navPoint class="chapter" id="chapter1" playOrder="1">
+//       <navLabel><text>Chapter 1</text></navLabel>
+//       <content src="chapter1.xhtml"/>
+//     </navPoint>
+//   </navMap>
+// </ncx>
+
+func makeNCX(info EbookInfo, uid string, dst string) error {
+	nav := []navPointXml{
+		navPointXml{Class: "chapter", Id: "frontmatter", PlayOrder: 0, Label: "Front Matter", Content: contentXml{Src: "frontmatter.xhtml"}},
+	}
+	for i, ch := range info.Chapters {
+		fn := fmt.Sprintf("%04d", i)
+		id := "ch" + fn
+		nav = append(nav, navPointXml{Class: "chapter", Id: id, PlayOrder: i + 1, Label: ch.Title, Content: contentXml{Src: fn + ".xhtml"}})
+	}
+	ncx := ncxXml{
+		Xmlns:   "http://www.daisy.org/z3986/2005/ncx/",
+		Version: "2005-1",
+		Lang:    "en",
+		Metas: []metaNcxXml{
+			metaNcxXml{Name: "dtb:uid", Content: uid},
+			metaNcxXml{Name: "dtb:depth", Content: "1"},
+			metaNcxXml{Name: "dtb:totalPageCount", Content: "0"},
+			metaNcxXml{Name: "dtb:maxPageNumber", Content: "0"},
+		},
+		Title:     info.Title,
+		Author:    info.Authors,
+		NavPoints: nav,
+	}
+	encoded, err := xml.MarshalIndent(&ncx, "", " ")
+	if err != nil {
+		return err
+	}
+	encoded = bytes.ReplaceAll(encoded, []byte("></meta>"), []byte("/>"))
+	encoded = bytes.ReplaceAll(encoded, []byte("></content>"), []byte("/>"))
+	return os.WriteFile(dst, encoded, 0o644)
+}
+
+type ncxXml struct {
+	XMLName   xml.Name      `xml:"ncx"`
+	Xmlns     string        `xml:"xmlns,attr"`
+	Version   string        `xml:"version,attr"`
+	Lang      string        `xml:"xml:lang,attr"`
+	Metas     []metaNcxXml  `xml:"head>meta"`
+	Title     string        `xml:"docTitle>text"`
+	Author    string        `xml:"docAuthor>text"`
+	NavPoints []navPointXml `xml:"navMap>navPoint"`
+}
+type metaNcxXml struct {
+	Name    string `xml:"name,attr"`
+	Content string `xml:"content,attr"`
+}
+type navPointXml struct {
+	Class     string     `xml:"class,attr"`
+	Id        string     `xml:"id,attr"`
+	PlayOrder int        `xml:"playOrder,attr"`
+	Label     string     `xml:"navLabel>text"`
+	Content   contentXml `xml:"content"`
+}
+type contentXml struct {
+	Src string `xml:"src,attr"`
 }
