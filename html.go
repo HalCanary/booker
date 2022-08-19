@@ -32,22 +32,34 @@ func TextNode(data string) *Node {
 func Element(tag string, attributes map[string]string, children ...*Node) *Node {
 	node := &Node{Type: html.ElementNode, Data: tag}
 	for k, v := range attributes {
-		if ns, key, found := strings.Cut(k, ":"); found {
-			node.Attr = append(node.Attr, html.Attribute{Namespace: ns, Key: key, Val: v})
-		} else {
-			node.Attr = append(node.Attr, html.Attribute{Key: k, Val: v})
-		}
+		node.Attr = append(node.Attr, makeAttribute(k, v))
 	}
-	for _, c := range children {
-		if c != nil {
-			node.AppendChild(c)
+	return Append(node, children...)
+}
+
+func Append(node *Node, children ...*Node) *Node {
+	if node != nil && node.Type == html.ElementNode {
+		for _, c := range children {
+			if c != nil {
+				node.AppendChild(c)
+			}
 		}
 	}
 	return node
 }
 
-func AddAttribute(node *Node, key, value string) {
-	node.Attr = append(node.Attr, html.Attribute{Key: key, Val: value})
+func makeAttribute(k, v string) html.Attribute {
+	if ns, key, found := strings.Cut(k, ":"); found {
+		return html.Attribute{Namespace: ns, Key: key, Val: v}
+	} else {
+		return html.Attribute{Key: k, Val: v}
+	}
+}
+
+func AddAttribute(node *Node, k, v string) {
+	if node != nil && node.Type == html.ElementNode {
+		node.Attr = append(node.Attr, makeAttribute(k, v))
+	}
 }
 
 // Return an element with the given children.
@@ -64,6 +76,72 @@ func RenderDoc(w io.Writer, root *Node) error {
 	e := html.Render(w, &d)
 	w.Write([]byte{'\n'})
 	return e
+}
+
+func RenderXMLDocument(w io.Writer, root *Node) error {
+	if root == nil || w == nil {
+		return nil
+	}
+	w.Write([]byte("<?xml version='1.0' encoding='utf-8'?>\n"))
+	cw := checkedWriter{Writer: w}
+	renderXHTML(&cw, root)
+	cw.Write([]byte{'\n'})
+	return cw.Error
+}
+
+// Generates XHTML1 doc.
+func RenderXHTMLDoc(w io.Writer, root *Node) error {
+	if root == nil {
+		return nil
+	}
+	return RenderXMLDocument(w, root)
+}
+
+type checkedWriter struct {
+	io.Writer
+	Error error
+}
+
+func (w *checkedWriter) Write(b []byte) {
+	if w.Error == nil {
+		_, w.Error = w.Writer.Write(b)
+	}
+}
+
+func renderXHTML(w *checkedWriter, node *Node) {
+	switch node.Type {
+	case html.ElementNode:
+		w.Write([]byte{'<'})
+		w.Write([]byte(node.Data))
+		for _, attr := range node.Attr {
+			w.Write([]byte{' '})
+			if attr.Namespace != "" {
+				w.Write([]byte(attr.Namespace))
+				w.Write([]byte{':'})
+			}
+			w.Write([]byte(attr.Key))
+			w.Write([]byte{'=', '"'})
+			w.Write([]byte(html.EscapeString(attr.Val)))
+			w.Write([]byte{'"'})
+		}
+		if node.FirstChild == nil {
+			w.Write([]byte{'/', '>'})
+		} else {
+			w.Write([]byte{'>'})
+			for c := node.FirstChild; c != nil; c = c.NextSibling {
+				renderXHTML(w, c)
+			}
+			w.Write([]byte{'<', '/'})
+			w.Write([]byte(node.Data))
+			w.Write([]byte{'>'})
+		}
+	case html.TextNode:
+		w.Write([]byte(html.EscapeString(node.Data)))
+	case html.CommentNode:
+		w.Write([]byte{'<', '!', '-', '-'})
+		w.Write([]byte(node.Data))
+		w.Write([]byte{'-', '-', '>'})
+	}
 }
 
 // Find the matching attributes, ignoring namespace.

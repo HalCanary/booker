@@ -11,7 +11,7 @@ var UnsupportedUrlError = errors.New("unsupported url")
 
 FUNCTIONS
 
-func AddAttribute(node *Node, key, value string)
+func AddAttribute(node *Node, k, v string)
 func CalculateLastModified(chapters []Chapter) time.Time
     Return the time of most recently modified chapter.
 
@@ -40,6 +40,10 @@ func Register(downloadFunction func(url string) (EbookInfo, error))
 func RenderDoc(w io.Writer, root *Node) error
     Generates HTML5 doc.
 
+func RenderXHTMLDoc(w io.Writer, root *Node) error
+    Generates XHTML1 doc.
+
+func RenderXMLDocument(w io.Writer, root *Node) error
 func SendFile(dst, path, contentType string, secrets EmailSecrets) error
     Send a file to a single destination.
 
@@ -113,6 +117,8 @@ func GetSecrets(path string) (EmailSecrets, error)
     Read email secrets from the given file.
 
 type Node = html.Node
+
+func Append(node *Node, children ...*Node) *Node
 
 func Cleanup(node *Node) *Node
     Clean up a HTML fragment.

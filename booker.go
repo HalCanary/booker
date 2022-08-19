@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
+	//	"time"
 )
 
 func check(err error) {
@@ -38,8 +38,7 @@ func main() {
 		address = strings.TrimSpace(string(addressData))
 	}
 
-	destination := filepath.Join(homeDir, "ebooks/html")
-	epubDestination := filepath.Join(homeDir, "ebooks/epub")
+	destination := filepath.Join(homeDir, "ebooks")
 
 	for _, arg := range flag.Args() {
 		bk, err := Download(arg)
@@ -52,21 +51,8 @@ func main() {
 			check(err)
 			log.Println(path)
 		}
-
-		basename := filepath.Base(path)
-		epubPath := filepath.Join(epubDestination,
-			basename[:len(basename)-len(filepath.Ext(basename))]+".epub")
-
-		if !exists(epubPath) {
-			start := time.Now()
-			err = EbookConvert(path, epubPath, bk)
-			check(err)
-			log.Printf("EbookConvert took %s\n", time.Now().Sub(start))
-		}
-		log.Println(epubPath)
-
 		if send {
-			err = SendFile(address, epubPath, "application/epub+zip", secrets)
+			err = SendFile(address, path, "application/epub+zip", secrets)
 			check(err)
 			log.Printf("Send message to %q.", address)
 		}
