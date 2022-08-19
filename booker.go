@@ -60,7 +60,7 @@ func main() {
 	destination := filepath.Join(homeDir, "ebooks")
 	check(os.MkdirAll(destination, 0o755))
 
-	for _, arg := range flag.Args() {
+	for _, arg := range flagset.Args() {
 		bk, err := Download(arg)
 		check(err)
 
