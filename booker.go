@@ -19,14 +19,29 @@ func check(err error) {
 	}
 }
 
+var (
+	send      bool
+	overwrite bool
+	flagset   flag.FlagSet
+)
+
+func init() {
+	flagset.Init("", flag.ExitOnError)
+	flagset.Usage = func() {
+		cmd := os.Args[0]
+		fmt.Fprintf(flagset.Output(), "Usage of %s:\n  %s [FLAGS] URL [MORE_URLS]\n\n", cmd, cmd)
+		flagset.PrintDefaults()
+	}
+	flagset.BoolVar(&send, "send", false, "also send via email")
+	flagset.BoolVar(&overwrite, "over", false, "force overwrite of output file")
+}
+
 func main() {
-	var (
-		send      bool
-		overwrite bool
-	)
-	flag.BoolVar(&send, "send", false, "also send via email")
-	flag.BoolVar(&overwrite, "over", false, "force overwritr")
-	flag.Parse()
+	flagset.Parse(os.Args[1:])
+	if flagset.NArg() == 0 {
+		flagset.Usage()
+		os.Exit(2)
+	}
 
 	homeDir, err := os.UserHomeDir()
 	check(err)
