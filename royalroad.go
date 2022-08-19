@@ -26,24 +26,25 @@ func init() {
 		}
 		info.Source = mainUrl
 
-		doc, err := html.Parse(main)
+		htmldoc, err := html.Parse(main)
 		main.Close()
 		if err != nil {
 			return info, err
 		}
-		info.Title = GetAttribute(findOneMatchingNode2(doc, "meta", "name", "twitter:title"), "content")
-		info.CoverURL = GetAttribute(findOneMatchingNode2(doc, "meta", "property", "og:image"), "content")
-		info.Authors = GetAttribute(findOneMatchingNode2(doc, "meta", "name", "twitter:creator"), "content")
+		doc := (*Node)(htmldoc)
+		info.Title = findOneMatchingNode2(doc, "meta", "name", "twitter:title").GetAttribute("content")
+		info.CoverURL = findOneMatchingNode2(doc, "meta", "property", "og:image").GetAttribute("content")
+		info.Authors = findOneMatchingNode2(doc, "meta", "name", "twitter:creator").GetAttribute("content")
 
 		descriptionNode := findOneMatchingNode2(doc, "div", "property", "description")
-		info.Comments = ExtractText(descriptionNode)
+		info.Comments = descriptionNode.ExtractText()
 
 		chapterTables := findOneMatchingNode2(doc, "table", "id", "chapters")
 
 		for _, row := range findAllMatchingNodes(chapterTables, "tr") {
 			link := findOneMatchingNode(row, "a")
-			path := GetAttribute(link, "href")
-			title := stripRe.ReplaceAllString(whitespaceRe.ReplaceAllString(ExtractText(link), " "), "")
+			path := link.GetAttribute("href")
+			title := stripRe.ReplaceAllString(whitespaceRe.ReplaceAllString(link.ExtractText(), " "), "")
 			if path == "" || title == "" {
 				continue
 			}
@@ -53,7 +54,7 @@ func init() {
 				continue
 			}
 			var modified time.Time
-			if t, _ := strconv.ParseInt(GetAttribute(findOneMatchingNode(row, "time"), "unixtime"), 10, 64); t != 0 {
+			if t, _ := strconv.ParseInt(findOneMatchingNode(row, "time").GetAttribute("unixtime"), 10, 64); t != 0 {
 				modified = time.Unix(t, 0)
 			}
 			info.Chapters = append(info.Chapters, Chapter{
@@ -62,7 +63,7 @@ func init() {
 				Modified: modified,
 			})
 		}
-		info.Modified = CalculateLastModified(info.Chapters)
+		info.Modified = info.CalculateLastModified()
 		log.Printf("%q -> discovered %d chapters (%s)\n", info.Title, len(info.Chapters), info.Modified)
 		for i, chapter := range info.Chapters {
 			os.Stderr.Write([]byte{'.'})
@@ -75,8 +76,8 @@ func init() {
 				return info, err
 			}
 			info.Chapters[i].Content =
-				Cleanup(Remove(
-					findOneMatchingNode2(ch, "div", "class", "chapter-inner chapter-content")))
+				Cleanup(
+					findOneMatchingNode2((*Node)(ch), "div", "class", "chapter-inner chapter-content").Remove())
 		}
 		os.Stderr.Write([]byte{'\n'})
 		info.Language = "en"

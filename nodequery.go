@@ -13,7 +13,7 @@ func findAllMatchingNodes(node *Node, tag string) []*Node {
 				result = append(result, n)
 			}
 			for child := n.FirstChild; child != nil; child = child.NextSibling {
-				findAllMatchingNodesImpl(child)
+				findAllMatchingNodesImpl((*Node)(child))
 			}
 		}
 	}
@@ -26,7 +26,7 @@ func findOneMatchingNode(node *Node, tag string) *Node {
 		return node
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
-		r := findOneMatchingNode(child, tag)
+		r := findOneMatchingNode((*Node)(child), tag)
 		if r != nil {
 			return r
 		}
@@ -43,7 +43,7 @@ func findOneMatchingNode2(node *Node, tag, attributeKey, attributeValue string) 
 		}
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
-		r := findOneMatchingNode2(child, tag, attributeKey, attributeValue)
+		r := findOneMatchingNode2((*Node)(child), tag, attributeKey, attributeValue)
 		if r != nil {
 			return r
 		}

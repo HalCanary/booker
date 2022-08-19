@@ -64,7 +64,7 @@ func cleanupStyle(node *Node) *Node {
 		case html.ElementNode:
 			if node.Data == "p" {
 				if isWhitespaceOnly(node) {
-					Remove(node)
+					node.Remove()
 					return nil
 				}
 				if i := getNodeAttributeIndex(node, "align"); i >= 0 {
@@ -85,7 +85,7 @@ func cleanupStyle(node *Node) *Node {
 			child := node.FirstChild
 			for child != nil {
 				next := child.NextSibling
-				cleanupStyle(child)
+				cleanupStyle((*Node)(child))
 				child = next
 			}
 
@@ -95,11 +95,11 @@ func cleanupStyle(node *Node) *Node {
 					child := node.FirstChild
 					for child != nil {
 						next := child.NextSibling
-						node.RemoveChild(child)
+						(*html.Node)(node).RemoveChild(child)
 						parent.InsertBefore(child, nextSibling)
 						child = next
 					}
-					parent.RemoveChild(node)
+					parent.RemoveChild((*html.Node)(node))
 				}
 			}
 		}
@@ -135,7 +135,7 @@ func isWhitespaceOnly(node *Node) bool {
 			return whiteSpaceOnly.MatchString(node.Data)
 		case html.ElementNode:
 			for child := node.FirstChild; child != nil; child = child.NextSibling {
-				if !isWhitespaceOnly(child) {
+				if !isWhitespaceOnly((*Node)(child)) {
 					return false
 				}
 			}

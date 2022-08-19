@@ -12,7 +12,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-type Node = html.Node
+type Node html.Node
 
 var whitespaceRegexp = regexp.MustCompile("\\s+")
 
@@ -35,14 +35,14 @@ func Element(tag string, attributes map[string]string, children ...*Node) *Node 
 	for k, v := range attributes {
 		node.Attr = append(node.Attr, makeAttribute(k, v))
 	}
-	return Append(node, children...)
+	return node.Append(children...)
 }
 
-func Append(node *Node, children ...*Node) *Node {
+func (node *Node) Append(children ...*Node) *Node {
 	if node != nil && node.Type == html.ElementNode {
 		for _, c := range children {
 			if c != nil {
-				node.AppendChild(c)
+				(*html.Node)(node).AppendChild((*html.Node)(c))
 			}
 		}
 	}
@@ -57,7 +57,7 @@ func makeAttribute(k, v string) html.Attribute {
 	}
 }
 
-func AddAttribute(node *Node, k, v string) {
+func (node *Node) AddAttribute(k, v string) {
 	if node != nil && node.Type == html.ElementNode {
 		node.Attr = append(node.Attr, makeAttribute(k, v))
 	}
@@ -69,18 +69,18 @@ func Elem(tag string, children ...*Node) *Node {
 }
 
 // Generates HTML5 doc.
-func RenderDoc(w io.Writer, root *Node) error {
-	d := Node{Type: html.DocumentNode}
-	dt := Node{Type: html.DoctypeNode, Data: "html"}
+func (root *Node) RenderHTML(w io.Writer) error {
+	d := html.Node{Type: html.DocumentNode}
+	dt := html.Node{Type: html.DoctypeNode, Data: "html"}
 	d.AppendChild(&dt)
-	d.AppendChild(root)
+	d.AppendChild((*html.Node)(root))
 	e := html.Render(w, &d)
 	w.Write([]byte{'\n'})
 	return e
 }
 
 // Generates XHTML1 doc.
-func RenderXHTMLDoc(w io.Writer, root *Node) error {
+func (root *Node) RenderXHTMLDoc(w io.Writer) error {
 	if root == nil || w == nil {
 		return nil
 	}
@@ -148,7 +148,7 @@ func renderXHTML(w *checkedWriter, node *Node) {
 			w.Write([]byte{'>'})
 			for c := node.FirstChild; c != nil; c = c.NextSibling {
 				if w.Error == nil {
-					renderXHTML(w, c)
+					renderXHTML(w, (*Node)(c))
 				}
 			}
 			w.Write([]byte{'<', '/'})
@@ -165,7 +165,7 @@ func renderXHTML(w *checkedWriter, node *Node) {
 }
 
 // Find the matching attributes, ignoring namespace.
-func GetAttribute(node *Node, key string) string {
+func (node *Node) GetAttribute(key string) string {
 	if node != nil {
 		for _, attr := range node.Attr {
 			if attr.Key == key {
@@ -191,26 +191,26 @@ func extractTextImpl(root *Node, accumulator *strings.Builder) {
 			case "p":
 				accumulator.WriteString("\n\n")
 			case "img":
-				accumulator.WriteString(GetAttribute(root, "alt"))
+				accumulator.WriteString(root.GetAttribute("alt"))
 			}
 		}
 		for child := root.FirstChild; child != nil; child = child.NextSibling {
-			extractTextImpl(child, accumulator)
+			extractTextImpl((*Node)(child), accumulator)
 		}
 	}
 }
 
 // Extract and combine all Text Nodes under given node.
-func ExtractText(root *Node) string {
+func (root *Node) ExtractText() string {
 	var b strings.Builder
 	extractTextImpl(root, &b)
 	return b.String()
 }
 
 // Remove a node from it's parent.
-func Remove(node *Node) *Node {
+func (node *Node) Remove() *Node {
 	if node != nil && node.Parent != nil {
-		node.Parent.RemoveChild(node)
+		node.Parent.RemoveChild((*html.Node)(node))
 	}
 	return node
 }

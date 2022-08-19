@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"math/rand"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -57,9 +56,9 @@ const conatainer_xml = xml.Header + `<container version="1.0" xmlns="urn:oasis:n
 `
 
 // Return the time of most recently modified chapter.
-func CalculateLastModified(chapters []Chapter) time.Time {
-	var result time.Time
-	for _, ch := range chapters {
+func (info EbookInfo) CalculateLastModified() time.Time {
+	var result time.Time = info.Modified
+	for _, ch := range info.Chapters {
 		if !ch.Modified.IsZero() && ch.Modified.After(result) {
 			result = ch.Modified
 		}
@@ -77,15 +76,6 @@ func head(title, style, comment string) *Node {
 		Elem("title", TextNode(title)),
 		Elem("style", TextNode(style)),
 	)
-}
-
-func writeDocument(path string, htmlNode *Node) error {
-	out, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	return RenderXHTMLDoc(out, htmlNode)
 }
 
 func (info EbookInfo) Name() string {
@@ -163,11 +153,11 @@ func writeFrontmatter(info EbookInfo, dst io.Writer, cover string) error {
 		pnode := Elem("p")
 		for i, c := range strings.Split(p, "\n\n") {
 			if i > 0 {
-				pnode.AppendChild(Elem("br"))
+				pnode.Append(Elem("br"))
 			}
-			pnode.AppendChild(TextNode(c))
+			pnode.Append(TextNode(c))
 		}
-		description.AppendChild(pnode)
+		description.Append(pnode)
 	}
 	htmlNode := Element("html", map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": info.Language},
 		head(info.Title, bookStyle, ""),
@@ -180,34 +170,35 @@ func writeFrontmatter(info EbookInfo, dst io.Writer, cover string) error {
 			description,
 		),
 	)
-	return RenderXHTMLDoc(dst, htmlNode)
+	return htmlNode.RenderXHTMLDoc(dst)
 }
 
 func writeChapter(chapter Chapter, url, lang string, dst io.Writer) error {
 	body := Elem("body")
 	if chapter.Url != "" {
-		Append(body, Comment(fmt.Sprintf("\n%s\n", chapter.Url)))
+		body.Append(Comment(fmt.Sprintf("\n%s\n", chapter.Url)))
 	}
-	Append(body, Element("h2", map[string]string{"class": "chapter"}, TextNode(chapter.Title)))
+	body.Append(Element("h2", map[string]string{"class": "chapter"}, TextNode(chapter.Title)))
 	if !chapter.Modified.IsZero() {
-		Append(body, Elem("p", Elem("em", TextNode(chapter.Modified.Format("2006-01-02")))))
+		body.Append(Elem("p", Elem("em", TextNode(chapter.Modified.Format("2006-01-02")))))
 	}
-	Append(body, Elem("hr"), chapter.Content, Elem("hr"))
+	body.Append(Elem("hr"), chapter.Content, Elem("hr"))
 	if url != "" {
-		Append(body, Elem("div", link(url, url)), Elem("hr"))
+		body.Append(Elem("div", link(url, url)), Elem("hr"))
 	}
-	return RenderXHTMLDoc(dst, Element("html",
+	htmlNode := Element("html",
 		map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": lang},
 		head(chapter.Title, bookStyle, ""),
 		body,
-	))
+	)
+	return htmlNode.RenderXHTMLDoc(dst)
 }
 
 func writeToc(info EbookInfo, dst io.Writer) error {
 	links := Element("ol", map[string]string{"class": "flat"})
 	for i, ch := range info.Chapters {
 		label := fmt.Sprintf("%d. %s", i+1, ch.Title)
-		Append(links, Elem("li", link(fmt.Sprintf("%04d.xhtml", i), label)))
+		links.Append(Elem("li", link(fmt.Sprintf("%04d.xhtml", i), label)))
 	}
 	htmlNode := Element("html",
 		map[string]string{
@@ -220,7 +211,7 @@ func writeToc(info EbookInfo, dst io.Writer) error {
 			Element("nav", map[string]string{"epub:type": "toc"}, Elem("h2", TextNode("Contents")), links),
 		),
 	)
-	return RenderXHTMLDoc(dst, htmlNode)
+	return htmlNode.RenderXHTMLDoc(dst)
 }
 
 func link(url, text string) *Node {

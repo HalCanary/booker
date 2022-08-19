@@ -10,19 +10,6 @@ var UnsupportedUrlError = errors.New("unsupported url")
 
 FUNCTIONS
 
-func AddAttribute(node *Node, k, v string)
-func CalculateLastModified(chapters []Chapter) time.Time
-    Return the time of most recently modified chapter.
-
-func EbookConvert(src, dst string, info EbookInfo) error
-    Call Calibre's `ebook-convert` command with metadata from `info`.
-
-func ExtractText(root *Node) string
-    Extract and combine all Text Nodes under given node.
-
-func GetAttribute(node *Node, key string) string
-    Find the matching attributes, ignoring namespace.
-
 func GetUrl(url, ref string, force bool) (io.ReadCloser, error)
     Fetch the content of a URL, using a cache if possible and if force is fakse.
 
@@ -35,12 +22,6 @@ func NormalizeString(v string) string
 
 func Register(downloadFunction func(url string) (EbookInfo, error))
     Register the given function.
-
-func RenderDoc(w io.Writer, root *Node) error
-    Generates HTML5 doc.
-
-func RenderXHTMLDoc(w io.Writer, root *Node) error
-    Generates XHTML1 doc.
 
 func SendFile(dst, path, contentType string, secrets EmailSecrets) error
     Send a file to a single destination.
@@ -79,6 +60,9 @@ func Download(url string) (EbookInfo, error)
     Return the result of the first registered download function that does not
     return UnsupportedUrlError.
 
+func (info EbookInfo) CalculateLastModified() time.Time
+    Return the time of most recently modified chapter.
+
 func (info EbookInfo) Name() string
 
 func (info EbookInfo) Write(dst io.Writer) error
@@ -116,9 +100,7 @@ type EmailSecrets struct {
 func GetSecrets(path string) (EmailSecrets, error)
     Read email secrets from the given file.
 
-type Node = html.Node
-
-func Append(node *Node, children ...*Node) *Node
+type Node html.Node
 
 func Cleanup(node *Node) *Node
     Clean up a HTML fragment.
@@ -132,11 +114,27 @@ func Elem(tag string, children ...*Node) *Node
 func Element(tag string, attributes map[string]string, children ...*Node) *Node
     Return an element with given attributes and children.
 
-func Remove(node *Node) *Node
-    Remove a node from it's parent.
-
 func TextNode(data string) *Node
     Return a HTML node with the given text.
+
+func (node *Node) AddAttribute(k, v string)
+
+func (node *Node) Append(children ...*Node) *Node
+
+func (root *Node) ExtractText() string
+    Extract and combine all Text Nodes under given node.
+
+func (node *Node) GetAttribute(key string) string
+    Find the matching attributes, ignoring namespace.
+
+func (node *Node) Remove() *Node
+    Remove a node from it's parent.
+
+func (root *Node) RenderHTML(w io.Writer) error
+    Generates HTML5 doc.
+
+func (root *Node) RenderXHTMLDoc(w io.Writer) error
+    Generates XHTML1 doc.
 
 type Zipper struct {
 	ZipWriter *zip.Writer
