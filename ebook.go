@@ -67,7 +67,6 @@ var BookAlreadyExists = errors.New("Book Already Exists")
 
 func head(title, style, comment string) *Node {
 	return Elem("head",
-		//Element("meta", map[string]string{"charset": "utf-8"}),
 		Element("meta", map[string]string{
 			"http-equiv": "Content-Type", "content": "text/html; charset=utf-8"}),
 		Comment(comment),
@@ -103,23 +102,6 @@ func writeDocument(path string, htmlNode *Node) error {
 	return RenderXHTMLDoc(out, htmlNode)
 }
 
-func getCover(url, dst string) error {
-	rc, err := GetUrl(url, "", false)
-	if err != nil {
-		return err
-	}
-	src, _ := io.ReadAll(rc)
-	rc.Close()
-	jpeg, err := saveJpegWithScale(src, 400, 600)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(dst, jpeg, 0o644); err != nil {
-		return err
-	}
-	return nil
-}
-
 func bookName(info EbookInfo) string {
 	name := re.ReplaceAllString(NormalizeString(info.Title), "_")
 	if info.Modified.IsZero() {
@@ -133,81 +115,112 @@ func (info *EbookInfo) Write(directory string) (string, error) {
 	if info.Title == "" {
 		return "", errors.New("title missing")
 	}
-	name := bookName(*info)
-	dstDir := filepath.Join(directory, name)
-	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+	if err := os.MkdirAll(directory, 0o755); err != nil {
 		return "", err
 	}
-	if info.CoverURL != "" && info.CoverPath == "" {
-		fn := filepath.Join(dstDir, "cover.jpg")
-		err := getCover(info.CoverURL, fn)
+
+	name := bookName(*info)
+	uid := randomUUID()
+	zpath := filepath.Join(directory, name+".epub")
+
+	var jpegData []byte
+	var cover string
+	if info.CoverURL != "" {
+		rc, err := GetUrl(info.CoverURL, "", false)
 		if err != nil {
 			log.Printf("error: %v", err)
 		} else {
-			info.CoverPath, err = filepath.Abs(fn)
+			src, _ := io.ReadAll(rc)
+			rc.Close()
+			jpegData, err = saveJpegWithScale(src, 400, 600)
 			if err != nil {
 				log.Printf("error: %v", err)
-				info.CoverPath = ""
+			} else {
+				cover = "cover.jpg"
 			}
 		}
 	}
-	// 	dst := filepath.Join(dstDir)
-	// 	if exists(dst) {
-	// 		return dst, BookAlreadyExists
-	// 	}
-	err := writeBook(*info, dstDir)
-	if err != nil {
-		os.RemoveAll(dstDir)
-		return "", err
-	}
 
-	zpath := filepath.Join(dstDir, name+".epub")
 	zfile, err := os.Create(zpath)
 	if err != nil {
-		os.RemoveAll(dstDir)
 		return "", err
-
 	}
 	defer zfile.Close()
+
 	zw := zip.NewWriter(zfile)
 
-	zipRaw(zw, "mimetype", []byte("application/epub+zip"))
-	files := []string{
-		"META-INF/container.xml",
-		"toc.ncx",
-		"content.opf",
-		"frontmatter.xhtml",
-		"toc.xhtml",
+	err = zipRaw(zw, "mimetype", []byte("application/epub+zip"))
+	if err != nil {
+		return "", err
 	}
-	if info.CoverPath != "" {
-		files = append(files, "cover.jpg")
+
+	w, err := zw.Create("META-INF/container.xml")
+	if err != nil {
+		return "", err
 	}
-	for i, _ := range info.Chapters {
-		files = append(files, fmt.Sprintf("%04d.xhtml", i))
+	_, err = w.Write([]byte(conatainer_xml))
+	if err != nil {
+		return "", err
 	}
-	for _, f := range files {
-		err := zipFile(zw, f, dstDir)
+
+	w, err = zw.Create("toc.ncx")
+	if err != nil {
+		return "", err
+	}
+	err = makeNCX(*info, uid, w)
+	if err != nil {
+		return "", err
+	}
+
+	w, err = zw.Create("content.opf")
+	if err != nil {
+		return "", err
+	}
+	err = makePackage(*info, uid, w, cover)
+	if err != nil {
+		return "", err
+	}
+
+	w, err = zw.Create("frontmatter.xhtml")
+	if err != nil {
+		return "", err
+	}
+	err = writeFrontmatter(*info, w, cover)
+	if err != nil {
+		return "", err
+	}
+
+	w, err = zw.Create("toc.xhtml")
+	if err != nil {
+		return "", err
+	}
+	err = writeToc(*info, w)
+	if err != nil {
+		return "", err
+	}
+
+	if cover != "" {
+		w, err = zw.Create(cover)
+		if err != nil {
+			return "", err
+		}
+		_, err = w.Write(jpegData)
 		if err != nil {
 			return "", err
 		}
 	}
 
-	zw.Close()
-	return zpath, nil
-}
-
-func zipFile(zw *zip.Writer, name, dir string) error {
-	w, err := zw.Create(name)
-	if err != nil {
-		return err
+	for i, _ := range info.Chapters {
+		w, err = zw.Create(fmt.Sprintf("%04d.xhtml", i))
+		if err != nil {
+			return "", err
+		}
+		err = writeChapter(*info, i, w)
+		if err != nil {
+			return "", err
+		}
 	}
-	f, err := os.Open(filepath.Join(dir, name))
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = io.Copy(w, f)
-	return err
+	return zpath, zw.Close()
 }
 
 func zipRaw(zw *zip.Writer, name string, data []byte) error {
@@ -249,7 +262,7 @@ const conatainer_xml = xml.Header + `<container version="1.0" xmlns="urn:oasis:n
 </container>
 `
 
-func writeCover(info EbookInfo, dstDir string) error {
+func writeFrontmatter(info EbookInfo, dst io.Writer, cover string) error {
 	description := Elem("div")
 	for _, p := range strings.Split(info.Comments, "\n\n") {
 		pnode := Elem("p")
@@ -267,29 +280,29 @@ func writeCover(info EbookInfo, dstDir string) error {
 		//head(info.Title, bookStyle, infoComment(info)),
 		Elem("body",
 			Elem("h1", TextNode(info.Title)),
-			img(filepathRel(dstDir, info.CoverPath), "[COVER]"),
+			img(cover, "[COVER]"),
 			Elem("div", TextNode(info.Authors)),
 			Elem("div", TextNode(info.Source)),
 			Elem("div", Elem("em", TextNode(info.Modified.Format("2006-01-02")))),
 			description,
 		),
 	)
-	return writeDocument(filepath.Join(dstDir, "frontmatter.xhtml"), htmlNode)
+	return RenderXHTMLDoc(dst, htmlNode)
 }
 
-func writeToc(info EbookInfo, dstDir string) error {
+func writeChapter(info EbookInfo, i int, dst io.Writer) error {
+	chapter := info.Chapters[i]
+	htmlNode := Element("html", map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": info.Language},
+		head(chapter.Title, bookStyle, ""),
+		makeChapter(chapter, i+1 == len(info.Chapters)),
+	)
+	return RenderXHTMLDoc(dst, htmlNode)
+}
+
+func writeToc(info EbookInfo, dst io.Writer) error {
 	links := Elem("ol")
-	for i, chapter := range info.Chapters {
-		chapterFile := fmt.Sprintf("%s/%04d.xhtml", dstDir, i)
-		Append(links,
-			Elem("li", link(filepathRel(dstDir, chapterFile), chapter.Title)))
-		htmlNode := Element("html", map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": info.Language},
-			head(chapter.Title, bookStyle, ""),
-			makeChapter(chapter, i+1 == len(info.Chapters)),
-		)
-		if err := writeDocument(chapterFile, htmlNode); err != nil {
-			return err
-		}
+	for i, ch := range info.Chapters {
+		Append(links, Elem("li", link(fmt.Sprintf("%04d.xhtml", i), ch.Title)))
 	}
 	htmlNode := Element("html",
 		map[string]string{
@@ -299,32 +312,10 @@ func writeToc(info EbookInfo, dstDir string) error {
 		},
 		head(info.Title, bookStyle, ""),
 		Elem("body",
-			Element("h2", map[string]string{"class": "chapter"}, TextNode(info.Title)),
-			img(filepathRel(dstDir, info.CoverPath), "[COVER]"),
 			Element("nav", map[string]string{"epub:type": "toc"}, Elem("h2", TextNode("Contents")), links),
 		),
 	)
-	return writeDocument(filepath.Join(dstDir, "toc.xhtml"), htmlNode)
-}
-
-func writeBook(info EbookInfo, dstDir string) error {
-	if err := os.MkdirAll(filepath.Join(dstDir, "META-INF"), 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(dstDir, "META-INF/container.xml"), []byte(conatainer_xml), 0o644); err != nil {
-		return err
-	}
-	uid := randomUUID()
-	if err := makeNCX(info, uid, filepath.Join(dstDir, "toc.ncx")); err != nil {
-		return err
-	}
-	if err := makePackage(info, uid, filepath.Join(dstDir, "content.opf")); err != nil {
-		return err
-	}
-	if err := writeCover(info, dstDir); err != nil {
-		return err
-	}
-	return writeToc(info, dstDir)
+	return RenderXHTMLDoc(dst, htmlNode)
 }
 
 func link(url, text string) *Node {
@@ -377,8 +368,7 @@ func randomUUID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", v[0:4], v[4:6], v[6:8], v[8:10], v[10:16])
 }
 
-func makePackage(info EbookInfo, uuid, dst string) error {
-	cover := filepath.Base(info.CoverPath)
+func makePackage(info EbookInfo, uuid string, dst io.Writer, cover string) error {
 	manifestItems := []xmlItem{
 		xmlItem{Id: "frontmatter", Href: "frontmatter.xhtml", MediaType: "application/xhtml+xml"},
 		xmlItem{Id: "toc", Href: "toc.xhtml", MediaType: "application/xhtml+xml",
@@ -439,16 +429,8 @@ func makePackage(info EbookInfo, uuid, dst string) error {
 	encoded = bytes.ReplaceAll(encoded, []byte("></item>"), []byte("/>"))
 	encoded = bytes.ReplaceAll(encoded, []byte("></itemref>"), []byte("/>"))
 	encoded = bytes.ReplaceAll(encoded, []byte("></reference>"), []byte("/>"))
-	return os.WriteFile(dst, encoded, 0o644)
-	// 	f, err := os.Create(dst)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	defer f.Close()
-	// 	f.Write([]byte(xml.Header))
-	// 	enc := xml.NewEncoder(f)
-	// 	enc.Indent("", " ")
-	// 	return enc.Encode(&p)
+	_, err = dst.Write(encoded)
+	return err
 }
 
 type xmlPackage struct {
@@ -527,7 +509,7 @@ type xmlGuideReference struct {
 //   </navMap>
 // </ncx>
 
-func makeNCX(info EbookInfo, uid string, dst string) error {
+func makeNCX(info EbookInfo, uid string, dst io.Writer) error {
 	nav := []navPointXml{
 		navPointXml{Class: "chapter", Id: "frontmatter", PlayOrder: 0, Label: "Front Matter", Content: contentXml{Src: "frontmatter.xhtml"}},
 	}
@@ -556,7 +538,8 @@ func makeNCX(info EbookInfo, uid string, dst string) error {
 	}
 	encoded = bytes.ReplaceAll(encoded, []byte("></meta>"), []byte("/>"))
 	encoded = bytes.ReplaceAll(encoded, []byte("></content>"), []byte("/>"))
-	return os.WriteFile(dst, encoded, 0o644)
+	_, err = dst.Write(encoded)
+	return err
 }
 
 type ncxXml struct {
