@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
@@ -37,6 +38,12 @@ func init() {
 	log.SetFlags(0)
 }
 
+var (
+	secrets     EmailSecrets
+	address     string
+	destination string
+)
+
 func main() {
 	flagset.Parse(os.Args[1:])
 	if flagset.NArg() == 0 {
@@ -47,8 +54,6 @@ func main() {
 	homeDir, err := os.UserHomeDir()
 	check(err)
 
-	var secrets EmailSecrets
-	var address string
 	if send {
 		secrets, err = GetSecrets(filepath.Join(homeDir, ".email_secrets.json"))
 		check(err)
@@ -58,34 +63,56 @@ func main() {
 		address = strings.TrimSpace(string(addressData))
 	}
 
-	destination := filepath.Join(homeDir, "ebooks")
+	destination = filepath.Join(homeDir, "ebooks")
 	check(os.MkdirAll(destination, 0o755))
 
 	for _, arg := range flagset.Args() {
-		bk, err := Download(arg)
-		check(err)
-
-		name := bk.Name()
-		if name == "" {
-			check(errors.New("no name :("))
+		if strings.HasPrefix(arg, "@") {
+			handleUrlFile(arg[1:])
+		} else {
+			handle(arg)
 		}
-		path := filepath.Join(destination, name+".epub")
+	}
+}
 
-		if !overwrite && exists(path) {
-			log.Printf("%q already exists.\n\n", path)
-			continue
+func handleUrlFile(path string) {
+	f, err := os.Open(path)
+	check(err)
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		s := strings.TrimSpace(scanner.Text())
+		if s != "" {
+			handle(s)
 		}
-		f, err := os.Create(path)
-		check(err)
-		defer f.Close()
+	}
+	check(scanner.Err())
+}
 
-		check(bk.Write(f))
-		log.Printf("%q written\n\n", path)
+func handle(arg string) {
+	bk, err := Download(arg)
+	check(err)
 
-		if send {
-			check(SendFile(address, path, "application/epub+zip", secrets))
-			log.Printf("Sent message to %q.\n\n", address)
-		}
+	name := bk.Name()
+	if name == "" {
+		check(errors.New("no name :("))
+	}
+	path := filepath.Join(destination, name+".epub")
+
+	if !overwrite && exists(path) {
+		log.Printf("%q already exists.\n\n", path)
+		return
+	}
+	f, err := os.Create(path)
+	check(err)
+	defer f.Close()
+
+	check(bk.Write(f))
+	log.Printf("%q written\n\n", path)
+
+	if send {
+		check(SendFile(address, path, "application/epub+zip", secrets))
+		log.Printf("Sent message to %q.\n\n", address)
 	}
 }
 
