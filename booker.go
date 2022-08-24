@@ -34,6 +34,7 @@ func init() {
 	}
 	flagset.BoolVar(&send, "send", false, "also send via email")
 	flagset.BoolVar(&overwrite, "over", false, "force overwrite of output file")
+	log.SetFlags(0)
 }
 
 func main() {
@@ -71,7 +72,7 @@ func main() {
 		path := filepath.Join(destination, name+".epub")
 
 		if !overwrite && exists(path) {
-			log.Printf("%q already exists.\n", path)
+			log.Printf("%q already exists.\n\n", path)
 			continue
 		}
 		f, err := os.Create(path)
@@ -79,11 +80,11 @@ func main() {
 		defer f.Close()
 
 		check(bk.Write(f))
-		log.Printf("%q writtern\n", path)
+		log.Printf("%q written\n\n", path)
 
 		if send {
 			check(SendFile(address, path, "application/epub+zip", secrets))
-			log.Printf("Send message to %q.", address)
+			log.Printf("Sent message to %q.\n\n", address)
 		}
 	}
 }

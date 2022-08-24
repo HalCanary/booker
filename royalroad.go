@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -33,6 +34,10 @@ func init() {
 		}
 		doc := (*Node)(htmldoc)
 		info.Title = findOneMatchingNode2(doc, "meta", "name", "twitter:title").GetAttribute("content")
+		if info.Title == "" {
+			return info, fmt.Errorf("no title found: %q", mainUrl)
+		}
+
 		info.CoverURL = findOneMatchingNode2(doc, "meta", "property", "og:image").GetAttribute("content")
 		info.Authors = findOneMatchingNode2(doc, "meta", "name", "twitter:creator").GetAttribute("content")
 
@@ -65,8 +70,12 @@ func init() {
 		}
 		info.Modified = info.CalculateLastModified()
 		log.Printf("%q -> discovered %d chapters (%s)\n", info.Title, len(info.Chapters), info.Modified)
+		stderrStat, _ := os.Stderr.Stat()
+		charDevice := stderrStat.Mode()&os.ModeCharDevice != 0
 		for i, chapter := range info.Chapters {
-			os.Stderr.Write([]byte{'.'})
+			if charDevice {
+				fmt.Fprintf(os.Stderr, "\r[%d/%d]   ", i+1, len(info.Chapters))
+			}
 			chData, err := GetUrl(chapter.Url, mainUrl, false)
 			if err != nil {
 				return info, err
@@ -75,11 +84,16 @@ func init() {
 			if err != nil {
 				return info, err
 			}
+			info.Chapters[i].Content = (*Node)(ch)
+		}
+		if charDevice {
+			fmt.Fprint(os.Stderr, "\r           \r")
+		}
+		for i, chapter := range info.Chapters {
 			info.Chapters[i].Content =
 				Cleanup(
-					findOneMatchingNode2((*Node)(ch), "div", "class", "chapter-inner chapter-content").Remove())
+					findOneMatchingNode2(chapter.Content, "div", "class", "chapter-inner chapter-content").Remove())
 		}
-		os.Stderr.Write([]byte{'\n'})
 		info.Language = "en"
 		return info, nil
 	})
