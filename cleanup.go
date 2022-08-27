@@ -82,24 +82,24 @@ func cleanupStyle(node *Node) *Node {
 					node.Attr[i].Val = v
 				}
 			}
-			child := node.FirstChild
+			child := node.GetFirstChild()
 			for child != nil {
-				next := child.NextSibling
-				cleanupStyle((*Node)(child))
+				next := child.GetNextSibling()
+				cleanupStyle(child)
 				child = next
 			}
 
 			if node.Data == "span" && len(node.Attr) == 0 {
-				if parent := node.Parent; parent != nil {
-					nextSibling := node.NextSibling
-					child := node.FirstChild
+				if parent := node.GetParent(); parent != nil {
+					nextSibling := node.GetNextSibling()
+					child := node.GetFirstChild()
 					for child != nil {
-						next := child.NextSibling
-						(*html.Node)(node).RemoveChild(child)
+						next := child.GetNextSibling()
+						child.Remove()
 						parent.InsertBefore(child, nextSibling)
 						child = next
 					}
-					parent.RemoveChild((*html.Node)(node))
+					node.Remove()
 				}
 			}
 		}
@@ -110,7 +110,7 @@ func cleanupStyle(node *Node) *Node {
 func countChildren(node *Node) int {
 	var count int = 0
 	if node != nil {
-		for child := node.FirstChild; child != nil; child = child.NextSibling {
+		for child := node.GetFirstChild(); child != nil; child = child.GetNextSibling() {
 			count++
 		}
 	}
@@ -134,8 +134,8 @@ func isWhitespaceOnly(node *Node) bool {
 		case html.TextNode:
 			return whiteSpaceOnly.MatchString(node.Data)
 		case html.ElementNode:
-			for child := node.FirstChild; child != nil; child = child.NextSibling {
-				if !isWhitespaceOnly((*Node)(child)) {
+			for child := node.GetFirstChild(); child != nil; child = child.GetNextSibling() {
+				if !isWhitespaceOnly(child) {
 					return false
 				}
 			}

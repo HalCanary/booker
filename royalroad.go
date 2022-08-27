@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	Register(func(mainUrl string) (EbookInfo, error) {
+	Register(func(mainUrl string, populate bool) (EbookInfo, error) {
 		var info EbookInfo
 		mainUrlUrl, err := url.Parse(mainUrl)
 		if err != nil {
@@ -69,6 +69,10 @@ func init() {
 			})
 		}
 		info.Modified = info.CalculateLastModified()
+		if !populate {
+			info.Chapters = nil
+			return info, nil
+		}
 		log.Printf("%q -> discovered %d chapters (%s)\n", info.Title, len(info.Chapters), info.Modified)
 		stderrStat, _ := os.Stderr.Stat()
 		charDevice := stderrStat.Mode()&os.ModeCharDevice != 0

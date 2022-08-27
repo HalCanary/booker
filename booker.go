@@ -70,7 +70,7 @@ func main() {
 		if strings.HasPrefix(arg, "@") {
 			handleUrlFile(arg[1:])
 		} else {
-			handle(arg)
+			handle(arg, false)
 		}
 	}
 }
@@ -83,14 +83,14 @@ func handleUrlFile(path string) {
 	for scanner.Scan() {
 		s := strings.TrimSpace(scanner.Text())
 		if s != "" {
-			handle(s)
+			handle(s, false)
 		}
 	}
 	check(scanner.Err())
 }
 
-func handle(arg string) {
-	bk, err := Download(arg)
+func handle(arg string, pop bool) {
+	bk, err := Download(arg, pop)
 	check(err)
 
 	name := bk.Name()
@@ -101,6 +101,10 @@ func handle(arg string) {
 
 	if !overwrite && exists(path) {
 		log.Printf("%q already exists.\n\n", path)
+		return
+	}
+	if !pop {
+		handle(arg, true)
 		return
 	}
 	f, err := os.Create(path)

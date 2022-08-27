@@ -49,6 +49,14 @@ func (node *Node) Append(children ...*Node) *Node {
 	return node
 }
 
+func (node *Node) GetFirstChild() *Node {
+	return (*Node)(node.FirstChild)
+}
+
+func (node *Node) GetNextSibling() *Node {
+	return (*Node)(node.NextSibling)
+}
+
 func makeAttribute(k, v string) html.Attribute {
 	if ns, key, found := strings.Cut(k, ":"); found {
 		return html.Attribute{Namespace: ns, Key: key, Val: v}
@@ -213,4 +221,11 @@ func (node *Node) Remove() *Node {
 		node.Parent.RemoveChild((*html.Node)(node))
 	}
 	return node
+}
+
+func (n *Node) InsertBefore(v, o *Node) {
+	(*html.Node)(n).InsertBefore((*html.Node)(v), (*html.Node)(o))
+}
+func (n *Node) GetParent() *Node {
+	return (*Node)(n.Parent)
 }

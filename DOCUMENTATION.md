@@ -20,7 +20,7 @@ func Humanize(v int) string
 func NormalizeString(v string) string
     Simplify and normalize a Unicode string.
 
-func Register(downloadFunction func(url string) (EbookInfo, error))
+func Register(downloadFunction func(url string, pop bool) (EbookInfo, error))
     Register the given function.
 
 func SendFile(dst, path, contentType string, secrets EmailSecrets) error
@@ -56,9 +56,13 @@ type EbookInfo struct {
 }
     Ebook content and metadata.
 
-func Download(url string) (EbookInfo, error)
+func Download(url string, pop bool) (EbookInfo, error)
     Return the result of the first registered download function that does not
-    return UnsupportedUrlError.
+    return UnsupportedUrlError. @param url - the URL of the title page of the
+    book. @param pop - set to true to download and populate the entire EbookInfo
+    data
+
+        structure, not just it's metadata.
 
 func (info EbookInfo) CalculateLastModified() time.Time
     Return the time of most recently modified chapter.
@@ -126,6 +130,14 @@ func (root *Node) ExtractText() string
 
 func (node *Node) GetAttribute(key string) string
     Find the matching attributes, ignoring namespace.
+
+func (node *Node) GetFirstChild() *Node
+
+func (node *Node) GetNextSibling() *Node
+
+func (n *Node) GetParent() *Node
+
+func (n *Node) InsertBefore(v, o *Node)
 
 func (node *Node) Remove() *Node
     Remove a node from it's parent.
