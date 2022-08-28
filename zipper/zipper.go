@@ -1,4 +1,4 @@
-package main
+package zipper
 
 import (
 	"archive/zip"
@@ -11,7 +11,7 @@ type Zipper struct {
 	Error     error
 }
 
-func MakeZipper(dst io.Writer) Zipper {
+func Make(dst io.Writer) Zipper {
 	return Zipper{zip.NewWriter(dst), nil}
 }
 

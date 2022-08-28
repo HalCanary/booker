@@ -1,0 +1,8 @@
+package unorm // import "github.com/HalCanary/booker/unorm"
+
+
+FUNCTIONS
+
+func Normalize(v string) string
+    Simplify and normalize a Unicode string.
+

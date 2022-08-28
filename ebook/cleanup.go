@@ -1,11 +1,14 @@
-package main
+package ebook
 
 import (
 	"regexp"
 	"strings"
 
+	"github.com/HalCanary/booker/dom"
 	"golang.org/x/net/html"
 )
+
+type Node = dom.Node
 
 // Clean up a HTML fragment.
 func Cleanup(node *Node) *Node {

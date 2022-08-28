@@ -11,6 +11,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/HalCanary/booker/ebook"
+	"github.com/HalCanary/booker/email"
+	"github.com/HalCanary/booker/humanize"
 )
 
 func check(err error) {
@@ -39,7 +43,7 @@ func init() {
 }
 
 var (
-	secrets     EmailSecrets
+	secrets     email.EmailSecrets
 	address     string
 	destination string
 )
@@ -55,7 +59,7 @@ func main() {
 	check(err)
 
 	if send {
-		secrets, err = GetSecrets(filepath.Join(homeDir, ".email_secrets.json"))
+		secrets, err = email.GetSecrets(filepath.Join(homeDir, ".email_secrets.json"))
 		check(err)
 
 		addressData, err := os.ReadFile(filepath.Join(homeDir, ".ebook_address"))
@@ -90,7 +94,7 @@ func handleUrlFile(path string) {
 }
 
 func handle(arg string, pop bool) {
-	bk, err := Download(arg, pop)
+	bk, err := ebook.Download(arg, pop)
 	check(err)
 
 	name := bk.Name()
@@ -99,9 +103,12 @@ func handle(arg string, pop bool) {
 	}
 	path := filepath.Join(destination, name+".epub")
 
-	if !overwrite && exists(path) {
-		log.Printf("%q already exists.\n\n", path)
-		return
+	if !overwrite {
+		_, err := os.Stat(path)
+		if err == nil {
+			log.Printf("%q already exists.\n\n", path)
+			return
+		}
 	}
 	if !pop {
 		handle(arg, true)
@@ -121,20 +128,20 @@ func handle(arg string, pop bool) {
 }
 
 // Send a file to a single destination.
-func SendFile(dst, path, contentType string, secrets EmailSecrets) error {
+func SendFile(dst, path, contentType string, secrets email.EmailSecrets) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 	base := filepath.Base(path)
-	subject := fmt.Sprintf("(%s) %s", Humanize(len(data)), base)
-	return Email{
+	subject := fmt.Sprintf("(%s) %s", humanize.Humanize(len(data)), base)
+	return email.Email{
 		From:    secrets.FromAddr,
 		To:      []string{dst},
 		Subject: subject,
 		Content: "☺",
-		Attachments: []Attachment{
-			Attachment{
+		Attachments: []email.Attachment{
+			email.Attachment{
 				Data:        data,
 				ContentType: contentType,
 				Filename:    base,

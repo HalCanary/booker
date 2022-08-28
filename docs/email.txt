@@ -1,0 +1,44 @@
+package email // import "github.com/HalCanary/booker/email"
+
+
+TYPES
+
+type Attachment struct {
+	Filename    string
+	ContentType string
+	Data        []byte
+}
+    Attachment for an email.
+
+type Email struct {
+	Date        time.Time
+	To          []string
+	Cc          []string
+	Bcc         []string
+	From        string
+	Subject     string
+	Content     string
+	Attachments []Attachment
+	Headers     map[string]string
+}
+    An electric mail message.
+
+func (mail Email) Make() []byte
+    Make, but do not send an email message.
+
+func (m Email) Send(secrets EmailSecrets) error
+    Send the given email using the provided SMTP secrets.
+
+type EmailSecrets struct {
+	SmtpHost string            `json:"SMTP_HOST"` // example: "smtp.gmail.com"
+	SmtpUser string            `json:"SMTP_USER"` // example: "halcanary@gmail.com"
+	SmtpPass string            `json:"SMTP_PASS"` // for gmail, is a App Password
+	FromAddr string            `json:"FROM_ADDR"`
+	Headers  map[string]string `json:"HEADERS"`
+}
+    Data structure representing instructions for connecting to SMTP server.
+    Headers are additional headers to be added to outgoing email.
+
+func GetSecrets(path string) (EmailSecrets, error)
+    Read email secrets from the given file.
+

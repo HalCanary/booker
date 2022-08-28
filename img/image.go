@@ -1,4 +1,4 @@
-package main
+package img
 
 // Copyright 2022 Hal Canary
 // Use of this program is governed by the file LICENSE.
@@ -36,7 +36,7 @@ func writeJpeg(img image.Image, quality int) ([]byte, error) {
 	return buffer.Bytes(), err
 }
 
-func saveJpegWithScale(src []byte, minWidth, minHeight int) ([]byte, error) {
+func SaveJpegWithScale(src []byte, minWidth, minHeight int) ([]byte, error) {
 	img, fmt, err := decode(src)
 	if err != nil {
 		return nil, err

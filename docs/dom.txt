@@ -1,0 +1,52 @@
+package dom // import "github.com/HalCanary/booker/dom"
+
+
+TYPES
+
+type Node html.Node
+
+func Comment(data string) *Node
+    Return a HTML comment with the given data.
+
+func Elem(tag string, children ...*Node) *Node
+    Return an element with the given children.
+
+func Element(tag string, attributes map[string]string, children ...*Node) *Node
+    Return an element with given attributes and children.
+
+func FindAllMatchingNodes(node *Node, tag string) []*Node
+
+func FindOneMatchingNode(node *Node, tag string) *Node
+
+func FindOneMatchingNode2(node *Node, tag, attributeKey, attributeValue string) *Node
+
+func TextNode(data string) *Node
+    Return a HTML node with the given text.
+
+func (node *Node) AddAttribute(k, v string)
+
+func (node *Node) Append(children ...*Node) *Node
+
+func (root *Node) ExtractText() string
+    Extract and combine all Text Nodes under given node.
+
+func (node *Node) GetAttribute(key string) string
+    Find the matching attributes, ignoring namespace.
+
+func (node *Node) GetFirstChild() *Node
+
+func (node *Node) GetNextSibling() *Node
+
+func (n *Node) GetParent() *Node
+
+func (n *Node) InsertBefore(v, o *Node)
+
+func (node *Node) Remove() *Node
+    Remove a node from it's parent.
+
+func (root *Node) RenderHTML(w io.Writer) error
+    Generates HTML5 doc.
+
+func (root *Node) RenderXHTMLDoc(w io.Writer) error
+    Generates XHTML1 doc.
+

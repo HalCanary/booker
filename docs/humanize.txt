@@ -1,0 +1,9 @@
+package humanize // import "github.com/HalCanary/booker/humanize"
+
+
+FUNCTIONS
+
+func Humanize(v int) string
+    Humanize converts a byte size to a human readable number, for example: 2048
+    -> "2 kB"
+

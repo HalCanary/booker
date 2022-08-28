@@ -42,6 +42,4 @@ from the file `~/.email_secrets.json`.  This file has the following format:
 
 ## Internal APIs
 
-There are several useful internal APIs.  These might be broken out into their
-own packages if I feel that is a good idea.  These are documented in
-[DOCUMENTATION.md](DOCUMENTATION.md).
+See [./docs](./docs).

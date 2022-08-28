@@ -1,0 +1,6 @@
+package img // import "github.com/HalCanary/booker/img"
+
+
+FUNCTIONS
+
+func SaveJpegWithScale(src []byte, minWidth, minHeight int) ([]byte, error)

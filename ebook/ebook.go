@@ -1,4 +1,4 @@
-package main
+package ebook
 
 import (
 	"encoding/xml"
@@ -9,6 +9,12 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/HalCanary/booker/dom"
+	"github.com/HalCanary/booker/download"
+	"github.com/HalCanary/booker/img"
+	"github.com/HalCanary/booker/unorm"
+	"github.com/HalCanary/booker/zipper"
 )
 
 type Chapter struct {
@@ -32,9 +38,7 @@ type EbookInfo struct {
 }
 
 var (
-	re           = regexp.MustCompile("[^A-Za-z0-9.-]+")
-	whitespaceRe = regexp.MustCompile("\\s+")
-	stripRe      = regexp.MustCompile("(?:^\\s+)|(?:\\s+$)")
+	re = regexp.MustCompile("[^A-Za-z0-9.-]+")
 )
 
 const bookStyle = `
@@ -67,19 +71,19 @@ func (info EbookInfo) CalculateLastModified() time.Time {
 }
 
 func head(title, style, comment string) *Node {
-	return Elem("head",
-		Element("meta", map[string]string{
+	return dom.Elem("head",
+		dom.Element("meta", map[string]string{
 			"http-equiv": "Content-Type", "content": "text/html; charset=utf-8"}),
-		Comment(comment),
-		Element("meta", map[string]string{
+		dom.Comment(comment),
+		dom.Element("meta", map[string]string{
 			"name": "viewport", "content": "width=device-width, initial-scale=1.0"}),
-		Elem("title", TextNode(title)),
-		Elem("style", TextNode(style)),
+		dom.Elem("title", dom.TextNode(title)),
+		dom.Elem("style", dom.TextNode(style)),
 	)
 }
 
 func (info EbookInfo) Name() string {
-	name := re.ReplaceAllString(NormalizeString(info.Title), "_")
+	name := re.ReplaceAllString(unorm.Normalize(info.Title), "_")
 	if info.Modified.IsZero() {
 		return name
 	}
@@ -94,13 +98,13 @@ func (info EbookInfo) Write(dst io.Writer) error {
 		cover    string
 	)
 	if info.CoverURL != "" {
-		rc, err := GetUrl(info.CoverURL, "", false)
+		rc, err := download.GetUrl(info.CoverURL, "", false)
 		if err != nil {
 			log.Printf("error: %v", err)
 		} else {
 			src, _ := io.ReadAll(rc)
 			rc.Close()
-			jpegData, err = saveJpegWithScale(src, 400, 600)
+			jpegData, err = img.SaveJpegWithScale(src, 400, 600)
 			if err != nil {
 				log.Printf("error: %v", err)
 			} else {
@@ -108,8 +112,11 @@ func (info EbookInfo) Write(dst io.Writer) error {
 			}
 		}
 	}
+	for i, chapter := range info.Chapters {
+		info.Chapters[i].Content = Cleanup(chapter.Content)
+	}
 
-	zw := MakeZipper(dst)
+	zw := zipper.Make(dst)
 	defer zw.Close()
 
 	if w := zw.CreateStore("mimetype", info.Modified); w != nil {
@@ -148,25 +155,25 @@ func (info EbookInfo) Write(dst io.Writer) error {
 }
 
 func writeFrontmatter(info EbookInfo, dst io.Writer, cover string) error {
-	description := Elem("div")
+	description := dom.Elem("div")
 	for _, p := range strings.Split(info.Comments, "\n\n") {
-		pnode := Elem("p")
+		pnode := dom.Elem("p")
 		for i, c := range strings.Split(p, "\n\n") {
 			if i > 0 {
-				pnode.Append(Elem("br"))
+				pnode.Append(dom.Elem("br"))
 			}
-			pnode.Append(TextNode(c))
+			pnode.Append(dom.TextNode(c))
 		}
 		description.Append(pnode)
 	}
-	htmlNode := Element("html", map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": info.Language},
+	htmlNode := dom.Element("html", map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": info.Language},
 		head(info.Title, bookStyle, ""),
-		Elem("body",
-			Elem("h1", TextNode(info.Title)),
-			img(cover, "[COVER]"),
-			Elem("div", TextNode(info.Authors)),
-			Elem("div", TextNode(info.Source)),
-			Elem("div", Elem("em", TextNode(info.Modified.Format("2006-01-02")))),
+		dom.Elem("body",
+			dom.Elem("h1", dom.TextNode(info.Title)),
+			imgElem(cover, "[COVER]"),
+			dom.Elem("div", dom.TextNode(info.Authors)),
+			dom.Elem("div", dom.TextNode(info.Source)),
+			dom.Elem("div", dom.Elem("em", dom.TextNode(info.Modified.Format("2006-01-02")))),
 			description,
 		),
 	)
@@ -174,19 +181,19 @@ func writeFrontmatter(info EbookInfo, dst io.Writer, cover string) error {
 }
 
 func writeChapter(chapter Chapter, url, lang string, dst io.Writer) error {
-	body := Elem("body")
+	body := dom.Elem("body")
 	if chapter.Url != "" {
-		body.Append(Comment(fmt.Sprintf("\n%s\n", chapter.Url)))
+		body.Append(dom.Comment(fmt.Sprintf("\n%s\n", chapter.Url)))
 	}
-	body.Append(Element("h2", map[string]string{"class": "chapter"}, TextNode(chapter.Title)))
+	body.Append(dom.Element("h2", map[string]string{"class": "chapter"}, dom.TextNode(chapter.Title)))
 	if !chapter.Modified.IsZero() {
-		body.Append(Elem("p", Elem("em", TextNode(chapter.Modified.Format("2006-01-02")))))
+		body.Append(dom.Elem("p", dom.Elem("em", dom.TextNode(chapter.Modified.Format("2006-01-02")))))
 	}
-	body.Append(Elem("hr"), chapter.Content, Elem("hr"))
+	body.Append(dom.Elem("hr"), chapter.Content, dom.Elem("hr"))
 	if url != "" {
-		body.Append(Elem("div", link(url, url)), Elem("hr"))
+		body.Append(dom.Elem("div", link(url, url)), dom.Elem("hr"))
 	}
-	htmlNode := Element("html",
+	htmlNode := dom.Element("html",
 		map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": lang},
 		head(chapter.Title, bookStyle, ""),
 		body,
@@ -195,20 +202,20 @@ func writeChapter(chapter Chapter, url, lang string, dst io.Writer) error {
 }
 
 func writeToc(info EbookInfo, dst io.Writer) error {
-	links := Element("ol", map[string]string{"class": "flat"})
+	links := dom.Element("ol", map[string]string{"class": "flat"})
 	for i, ch := range info.Chapters {
 		label := fmt.Sprintf("%d. %s", i+1, ch.Title)
-		links.Append(Elem("li", link(fmt.Sprintf("%04d.xhtml", i), label)))
+		links.Append(dom.Elem("li", link(fmt.Sprintf("%04d.xhtml", i), label)))
 	}
-	htmlNode := Element("html",
+	htmlNode := dom.Element("html",
 		map[string]string{
 			"xmlns":      "http://www.w3.org/1999/xhtml",
 			"xml:lang":   info.Language,
 			"xmlns:epub": "http://www.idpf.org/2007/ops",
 		},
 		head(info.Title, bookStyle, ""),
-		Elem("body",
-			Element("nav", map[string]string{"epub:type": "toc"}, Elem("h2", TextNode("Contents")), links),
+		dom.Elem("body",
+			dom.Element("nav", map[string]string{"epub:type": "toc"}, dom.Elem("h2", dom.TextNode("Contents")), links),
 		),
 	)
 	return htmlNode.RenderXHTMLDoc(dst)
@@ -218,14 +225,14 @@ func link(url, text string) *Node {
 	if url == "" {
 		return nil
 	}
-	return Element("a", map[string]string{"href": url}, TextNode(text))
+	return dom.Element("a", map[string]string{"href": url}, dom.TextNode(text))
 }
 
-func img(url, alt string) *Node {
+func imgElem(url, alt string) *Node {
 	if url == "" {
 		return nil
 	}
-	return Element("img", map[string]string{"src": url, "alt": alt})
+	return dom.Element("img", map[string]string{"src": url, "alt": alt})
 }
 
 func randomUUID() string {

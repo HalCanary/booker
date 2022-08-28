@@ -1,10 +1,10 @@
-package main
+package dom
 
 import (
 	"golang.org/x/net/html"
 )
 
-func findAllMatchingNodes(node *Node, tag string) []*Node {
+func FindAllMatchingNodes(node *Node, tag string) []*Node {
 	var result []*Node
 	var findAllMatchingNodesImpl func(n *Node)
 	findAllMatchingNodesImpl = func(n *Node) {
@@ -21,12 +21,12 @@ func findAllMatchingNodes(node *Node, tag string) []*Node {
 	return result
 }
 
-func findOneMatchingNode(node *Node, tag string) *Node {
+func FindOneMatchingNode(node *Node, tag string) *Node {
 	if node.Type == html.ElementNode && node.Data == tag {
 		return node
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
-		r := findOneMatchingNode((*Node)(child), tag)
+		r := FindOneMatchingNode((*Node)(child), tag)
 		if r != nil {
 			return r
 		}
@@ -34,7 +34,7 @@ func findOneMatchingNode(node *Node, tag string) *Node {
 	return nil
 }
 
-func findOneMatchingNode2(node *Node, tag, attributeKey, attributeValue string) *Node {
+func FindOneMatchingNode2(node *Node, tag, attributeKey, attributeValue string) *Node {
 	if node.Type == html.ElementNode && node.Data == tag {
 		for _, attr := range node.Attr {
 			if attr.Key == attributeKey && attr.Val == attributeValue {
@@ -43,7 +43,7 @@ func findOneMatchingNode2(node *Node, tag, attributeKey, attributeValue string) 
 		}
 	}
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
-		r := findOneMatchingNode2((*Node)(child), tag, attributeKey, attributeValue)
+		r := FindOneMatchingNode2((*Node)(child), tag, attributeKey, attributeValue)
 		if r != nil {
 			return r
 		}

@@ -1,26 +1,21 @@
 # Copyright 2022 Hal Canary
 # Use of this program is governed by the file LICENSE.
 
-all: test booker doc
+all: test doc booker
 
-booker: $(wildcard *.go)
-	go build .
+booker: $(shell find . -name '*.go')
+	go build ./cmd/booker
 
 clean:
 	rm -f booker
 
-clean-all:
-	rm -rf booker dst
-
 test:
-	go test .
+	go test ./...
 
-DOCUMENTATION.md: $(wildcard *.go)
-	{ echo '```'; go doc -all .; echo '```'; } > $@
-
-doc: DOCUMENTATION.md
+doc:
+	for x in `go list ./...`; do go doc --all $$x > docs/`basename $$x`.txt; done
 
 fmt:
-	gofmt -w *.go
+	find . -type f -name '*.go' -exec gofmt -w {} \;
 
 .PHONY: clean clean-all test all doc fmt

@@ -1,0 +1,58 @@
+package ebook // import "github.com/HalCanary/booker/ebook"
+
+
+VARIABLES
+
+var UnsupportedUrlError = errors.New("unsupported url")
+    Returned by a downloadFunction when the URL can not be handled.
+
+
+FUNCTIONS
+
+func Register(downloadFunction func(url string, pop bool) (EbookInfo, error))
+    Register the given function.
+
+
+TYPES
+
+type Chapter struct {
+	Title    string
+	Url      string
+	Content  *Node
+	Modified time.Time
+}
+
+type EbookInfo struct {
+	Authors   string
+	CoverURL  string
+	CoverPath string
+	Comments  string
+	Title     string
+	Source    string
+	Language  string
+	Chapters  []Chapter
+	Modified  time.Time
+}
+    Ebook content and metadata.
+
+func Download(url string, pop bool) (EbookInfo, error)
+    Return the result of the first registered download function that does not
+    return UnsupportedUrlError. @param url - the URL of the title page of the
+    book. @param pop - set to true to download and populate the entire EbookInfo
+    data
+
+        structure, not just it's metadata.
+
+func (info EbookInfo) CalculateLastModified() time.Time
+    Return the time of most recently modified chapter.
+
+func (info EbookInfo) Name() string
+
+func (info EbookInfo) Write(dst io.Writer) error
+    Write the ebook as an Epub.
+
+type Node = dom.Node
+
+func Cleanup(node *Node) *Node
+    Clean up a HTML fragment.
+

@@ -1,0 +1,18 @@
+package zipper // import "github.com/HalCanary/booker/zipper"
+
+
+TYPES
+
+type Zipper struct {
+	ZipWriter *zip.Writer
+	Error     error
+}
+
+func Make(dst io.Writer) Zipper
+
+func (zw *Zipper) Close()
+
+func (zw *Zipper) CreateDeflate(name string, mod time.Time) io.Writer
+
+func (zw *Zipper) CreateStore(name string, mod time.Time) io.Writer
+
