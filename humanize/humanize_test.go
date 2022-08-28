@@ -1,5 +1,8 @@
 package humanize
 
+// Copyright 2022 Hal Canary
+// Use of this program is governed by the file LICENSE.
+
 import "testing"
 
 func TestHumanize(t *testing.T) {

@@ -125,4 +125,3 @@ func handle(arg string, pop bool) {
 		log.Printf("Sent message to %q.\n\n", address)
 	}
 }
-

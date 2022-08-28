@@ -1,5 +1,7 @@
 package email // import "github.com/HalCanary/booker/email"
 
+Copyright 2022 Hal Canary Use of this program is governed by the file
+LICENSE.
 
 FUNCTIONS
 

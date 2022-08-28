@@ -1,5 +1,7 @@
 package humanize // import "github.com/HalCanary/booker/humanize"
 
+Copyright 2022 Hal Canary Use of this program is governed by the file
+LICENSE.
 
 FUNCTIONS
 

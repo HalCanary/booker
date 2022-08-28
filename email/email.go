@@ -1,10 +1,11 @@
+// Copyright 2022 Hal Canary
+// Use of this program is governed by the file LICENSE.
 package email
 
 import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"path/filepath"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -14,6 +15,7 @@ import (
 	"net/smtp"
 	"net/textproto"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/HalCanary/booker/humanize"
