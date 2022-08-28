@@ -6,6 +6,7 @@ LICENSE.
 TYPES
 
 type Node html.Node
+    Alias for golang.org/x/net/html.Node.
 
 func Comment(data string) *Node
     Return a HTML comment with the given data.
@@ -16,11 +17,8 @@ func Elem(tag string, children ...*Node) *Node
 func Element(tag string, attributes map[string]string, children ...*Node) *Node
     Return an element with given attributes and children.
 
-func FindAllMatchingNodes(node *Node, tag string) []*Node
-
-func FindOneMatchingNode(node *Node, tag string) *Node
-
-func FindOneMatchingNode2(node *Node, tag, attributeKey, attributeValue string) *Node
+func Parse(source io.Reader) (*Node, error)
+    Wrapper for golang.org/x/net/html.Parse.
 
 func TextNode(data string) *Node
     Return a HTML node with the given text.
@@ -31,6 +29,12 @@ func (node *Node) Append(children ...*Node) *Node
 
 func (root *Node) ExtractText() string
     Extract and combine all Text Nodes under given node.
+
+func (node *Node) FindAllMatchingNodes(tag string) []*Node
+
+func (node *Node) FindOneMatchingNode(tag string) *Node
+
+func (node *Node) FindOneMatchingNode2(tag, attributeKey, attributeValue string) *Node
 
 func (node *Node) GetAttribute(key string) string
     Find the matching attributes, ignoring namespace.

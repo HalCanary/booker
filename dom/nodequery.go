@@ -7,7 +7,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-func FindAllMatchingNodes(node *Node, tag string) []*Node {
+func (node *Node) FindAllMatchingNodes(tag string) []*Node {
 	var result []*Node
 	var findAllMatchingNodesImpl func(n *Node)
 	findAllMatchingNodesImpl = func(n *Node) {
@@ -15,8 +15,8 @@ func FindAllMatchingNodes(node *Node, tag string) []*Node {
 			if n.Type == html.ElementNode && n.Data == tag {
 				result = append(result, n)
 			}
-			for child := n.FirstChild; child != nil; child = child.NextSibling {
-				findAllMatchingNodesImpl((*Node)(child))
+			for child := n.GetFirstChild(); child != nil; child = child.GetNextSibling() {
+				findAllMatchingNodesImpl(child)
 			}
 		}
 	}
@@ -24,12 +24,12 @@ func FindAllMatchingNodes(node *Node, tag string) []*Node {
 	return result
 }
 
-func FindOneMatchingNode(node *Node, tag string) *Node {
+func (node *Node) FindOneMatchingNode(tag string) *Node {
 	if node.Type == html.ElementNode && node.Data == tag {
 		return node
 	}
-	for child := node.FirstChild; child != nil; child = child.NextSibling {
-		r := FindOneMatchingNode((*Node)(child), tag)
+	for child := node.GetFirstChild(); child != nil; child = child.GetNextSibling() {
+		r := child.FindOneMatchingNode(tag)
 		if r != nil {
 			return r
 		}
@@ -37,7 +37,7 @@ func FindOneMatchingNode(node *Node, tag string) *Node {
 	return nil
 }
 
-func FindOneMatchingNode2(node *Node, tag, attributeKey, attributeValue string) *Node {
+func (node *Node) FindOneMatchingNode2(tag, attributeKey, attributeValue string) *Node {
 	if node.Type == html.ElementNode && node.Data == tag {
 		for _, attr := range node.Attr {
 			if attr.Key == attributeKey && attr.Val == attributeValue {
@@ -45,8 +45,8 @@ func FindOneMatchingNode2(node *Node, tag, attributeKey, attributeValue string) 
 			}
 		}
 	}
-	for child := node.FirstChild; child != nil; child = child.NextSibling {
-		r := FindOneMatchingNode2((*Node)(child), tag, attributeKey, attributeValue)
+	for child := node.GetFirstChild(); child != nil; child = child.GetNextSibling() {
+		r := child.FindOneMatchingNode2(tag, attributeKey, attributeValue)
 		if r != nil {
 			return r
 		}

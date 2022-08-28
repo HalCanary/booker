@@ -11,9 +11,16 @@ import (
 	"golang.org/x/net/html"
 )
 
+// Alias for golang.org/x/net/html.Node.
 type Node html.Node
 
 var whitespaceRegexp = regexp.MustCompile("\\s+")
+
+// Wrapper for golang.org/x/net/html.Parse.
+func Parse(source io.Reader) (*Node, error) {
+	n, err := html.Parse(source)
+	return (*Node)(n), err
+}
 
 // Return a HTML comment with the given data.
 func Comment(data string) *Node {

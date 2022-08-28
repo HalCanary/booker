@@ -15,7 +15,6 @@ import (
 	"github.com/HalCanary/booker/dom"
 	"github.com/HalCanary/booker/download"
 	"github.com/HalCanary/booker/ebook"
-	"golang.org/x/net/html"
 )
 
 type node = dom.Node
@@ -41,27 +40,26 @@ func init() {
 		}
 		info.Source = mainUrl
 
-		htmldoc, err := html.Parse(main)
+		doc, err := dom.Parse(main)
 		main.Close()
 		if err != nil {
 			return info, err
 		}
-		doc := (*node)(htmldoc)
-		info.Title = dom.FindOneMatchingNode2(doc, "meta", "name", "twitter:title").GetAttribute("content")
+		info.Title = doc.FindOneMatchingNode2("meta", "name", "twitter:title").GetAttribute("content")
 		if info.Title == "" {
 			return info, fmt.Errorf("no title found: %q", mainUrl)
 		}
 
-		info.CoverURL = dom.FindOneMatchingNode2(doc, "meta", "property", "og:image").GetAttribute("content")
-		info.Authors = dom.FindOneMatchingNode2(doc, "meta", "name", "twitter:creator").GetAttribute("content")
+		info.CoverURL = doc.FindOneMatchingNode2("meta", "property", "og:image").GetAttribute("content")
+		info.Authors = doc.FindOneMatchingNode2("meta", "name", "twitter:creator").GetAttribute("content")
 
-		descriptionNode := dom.FindOneMatchingNode2(doc, "div", "property", "description")
+		descriptionNode := doc.FindOneMatchingNode2("div", "property", "description")
 		info.Comments = descriptionNode.ExtractText()
 
-		chapterTables := dom.FindOneMatchingNode2(doc, "table", "id", "chapters")
+		chapterTables := doc.FindOneMatchingNode2("table", "id", "chapters")
 
-		for _, row := range dom.FindAllMatchingNodes(chapterTables, "tr") {
-			link := dom.FindOneMatchingNode(row, "a")
+		for _, row := range chapterTables.FindAllMatchingNodes("tr") {
+			link := row.FindOneMatchingNode("a")
 			path := link.GetAttribute("href")
 			title := stripRe.ReplaceAllString(whitespaceRe.ReplaceAllString(link.ExtractText(), " "), "")
 			if path == "" || title == "" {
@@ -73,7 +71,7 @@ func init() {
 				continue
 			}
 			var modified time.Time
-			if t, _ := strconv.ParseInt(dom.FindOneMatchingNode(row, "time").GetAttribute("unixtime"), 10, 64); t != 0 {
+			if t, _ := strconv.ParseInt(row.FindOneMatchingNode("time").GetAttribute("unixtime"), 10, 64); t != 0 {
 				modified = time.Unix(t, 0)
 			}
 			info.Chapters = append(info.Chapters, ebook.Chapter{
@@ -98,12 +96,13 @@ func init() {
 			if err != nil {
 				return info, err
 			}
-			ch, err := html.Parse(chData)
+			ch, err := dom.Parse(chData)
+			chData.Close()
 			if err != nil {
 				return info, err
 			}
-			info.Chapters[i].Content = dom.FindOneMatchingNode2(
-				(*dom.Node)(ch), "div", "class", "chapter-inner chapter-content").Remove()
+			info.Chapters[i].Content = ch.FindOneMatchingNode2(
+				"div", "class", "chapter-inner chapter-content").Remove()
 
 		}
 		if charDevice {
