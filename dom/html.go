@@ -214,7 +214,7 @@ func (root *Node) ExtractText() string {
 	return b.String()
 }
 
-// Remove a node from it's parent.
+// Remove a node from its parent.
 func (node *Node) Remove() *Node {
 	if node != nil && node.Parent != nil {
 		node.Parent.RemoveChild((*html.Node)(node))

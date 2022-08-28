@@ -44,7 +44,7 @@ func (n *Node) GetParent() *Node
 func (n *Node) InsertBefore(v, o *Node)
 
 func (node *Node) Remove() *Node
-    Remove a node from it's parent.
+    Remove a node from its parent.
 
 func (root *Node) RenderHTML(w io.Writer) error
     Generates HTML5 doc.
