@@ -1,6 +1,12 @@
 package email // import "github.com/HalCanary/booker/email"
 
 
+FUNCTIONS
+
+func SendFile(dst, path, contentType string, secrets EmailSecrets) error
+    Send a file to a single destination.
+
+
 TYPES
 
 type Attachment struct {

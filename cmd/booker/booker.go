@@ -14,7 +14,6 @@ import (
 
 	"github.com/HalCanary/booker/ebook"
 	"github.com/HalCanary/booker/email"
-	"github.com/HalCanary/booker/humanize"
 )
 
 func check(err error) {
@@ -122,30 +121,8 @@ func handle(arg string, pop bool) {
 	log.Printf("%q written\n\n", path)
 
 	if send {
-		check(SendFile(address, path, "application/epub+zip", secrets))
+		check(email.SendFile(address, path, "application/epub+zip", secrets))
 		log.Printf("Sent message to %q.\n\n", address)
 	}
 }
 
-// Send a file to a single destination.
-func SendFile(dst, path, contentType string, secrets email.EmailSecrets) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	base := filepath.Base(path)
-	subject := fmt.Sprintf("(%s) %s", humanize.Humanize(len(data)), base)
-	return email.Email{
-		From:    secrets.FromAddr,
-		To:      []string{dst},
-		Subject: subject,
-		Content: "☺",
-		Attachments: []email.Attachment{
-			email.Attachment{
-				Data:        data,
-				ContentType: contentType,
-				Filename:    base,
-			},
-		},
-	}.Send(secrets)
-}

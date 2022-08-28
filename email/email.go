@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"path/filepath"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -14,6 +15,8 @@ import (
 	"net/textproto"
 	"os"
 	"time"
+
+	"github.com/HalCanary/booker/humanize"
 )
 
 // Data structure representing instructions for connecting to SMTP server.
@@ -121,6 +124,29 @@ func (mail Email) Make() []byte {
 	}
 	mw.Close()
 	return buffer.Bytes()
+}
+
+// Send a file to a single destination.
+func SendFile(dst, path, contentType string, secrets EmailSecrets) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	base := filepath.Base(path)
+	subject := fmt.Sprintf("(%s) %s", humanize.Humanize(len(data)), base)
+	return Email{
+		From:    secrets.FromAddr,
+		To:      []string{dst},
+		Subject: subject,
+		Content: "☺",
+		Attachments: []Attachment{
+			Attachment{
+				Data:        data,
+				ContentType: contentType,
+				Filename:    base,
+			},
+		},
+	}.Send(secrets)
 }
 
 func wb(buffer *bytes.Buffer, strings ...string) {
