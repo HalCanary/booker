@@ -23,6 +23,8 @@ import (
 	"github.com/HalCanary/booker/humanize"
 )
 
+const crlf = "\r\n"
+
 // Data structure representing instructions for connecting to SMTP server.
 // Headers are additional headers to be added to outgoing email.
 type EmailSecrets struct {
@@ -92,12 +94,13 @@ func encodeHeader(out io.StringWriter, key, s string) {
 			out.WriteString(" ")
 		}
 	}
-	out.WriteString("\n")
+	out.WriteString(crlf)
 }
 
 // Make, but do not send an email message.
 func (mail Email) Make() []byte {
 	const boundary = "================"
+	const mixedContentType = "multipart/mixed; boundary=\"" + boundary + "\""
 	var buffer bytes.Buffer
 	if mail.Date.IsZero() {
 		mail.Date = time.Now()
@@ -115,9 +118,8 @@ func (mail Email) Make() []byte {
 		encodeHeader(&buffer, key, value)
 	}
 	encodeHeader(&buffer, "MIME-Version", "1.0")
-	mixedContentType := fmt.Sprintf("multipart/mixed; boundary=%q", boundary)
 	encodeHeader(&buffer, "Content-Type", mixedContentType)
-	buffer.WriteString("\n") // end of header
+	buffer.WriteString(crlf) // end of header
 
 	mw := multipart.NewWriter(&buffer)
 	mw.SetBoundary(boundary)
@@ -182,17 +184,19 @@ func quotedprintableWrite(src string, dst io.Writer) {
 }
 
 func base64Write(src []byte, dst io.Writer) {
-	var bb bytes.Buffer
-	encoder := base64.NewEncoder(base64.StdEncoding, &bb)
-	encoder.Write(src)
-	encoder.Close()
-	line := [76]byte{}
-	for {
-		n, _ := bb.Read(line[:])
-		if n == 0 {
-			break
+	endofline := []byte(crlf)
+	const linelength = 57
+	const bufferlength = 78 // base64.StdEncoding.EncodedLen(57) + 2
+	var buffer [bufferlength]byte
+	for len(src) > 0 {
+		l := len(src)
+		if l > linelength {
+			l = linelength
 		}
-		dst.Write(line[:n])
-		dst.Write([]byte{'\n'})
+		el := base64.StdEncoding.EncodedLen(l)
+		base64.StdEncoding.Encode(buffer[:el], src[:l])
+		src = src[l:]
+		copy(buffer[el:el+2], endofline)
+		dst.Write(buffer[:el+2])
 	}
 }
