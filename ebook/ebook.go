@@ -8,14 +8,12 @@ import (
 	"io"
 	"log"
 	"math/rand"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/HalCanary/booker/dom"
 	"github.com/HalCanary/booker/download"
 	"github.com/HalCanary/booker/img"
-	"github.com/HalCanary/booker/unorm"
 	"github.com/HalCanary/booker/zipper"
 )
 
@@ -38,10 +36,6 @@ type EbookInfo struct {
 	Chapters  []Chapter
 	Modified  time.Time
 }
-
-var (
-	re = regexp.MustCompile("[^A-Za-z0-9.-]+")
-)
 
 const bookStyle = `
 div p{text-indent:2em;margin-top:0;margin-bottom:0}
@@ -82,14 +76,6 @@ func head(title, style, comment string) *Node {
 		dom.Elem("title", dom.TextNode(title)),
 		dom.Elem("style", dom.TextNode(style)),
 	)
-}
-
-func (info EbookInfo) Name() string {
-	name := re.ReplaceAllString(unorm.Normalize(info.Title), "_")
-	if info.Modified.IsZero() {
-		return name
-	}
-	return name + info.Modified.UTC().Format("_2006-01-02_150405")
 }
 
 // Write the ebook as an Epub.

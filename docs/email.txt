@@ -13,7 +13,7 @@ TYPES
 
 type Attachment struct {
 	Filename    string
-	ContentType string
+	ContentType string // If empty, determined via http.DetectContentType.
 	Data        []byte
 }
     Attachment for an email.

@@ -10,10 +10,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/HalCanary/booker/ebook"
 	"github.com/HalCanary/booker/email"
+	"github.com/HalCanary/booker/unorm"
 )
 
 func check(err error) {
@@ -27,6 +29,7 @@ var (
 	send      bool
 	overwrite bool
 	flagset   flag.FlagSet
+	badfileRe = regexp.MustCompile("[^A-Za-z0-9._+-]+")
 )
 
 func init() {
@@ -71,34 +74,46 @@ func main() {
 
 	for _, arg := range flagset.Args() {
 		if strings.HasPrefix(arg, "@") {
-			handleUrlFile(arg[1:])
+			lines, err := readFile(arg[1:])
+			check(err)
+			for _, s := range lines {
+				s = strings.TrimSpace(s)
+				if s != "" {
+					handle(s, false)
+				}
+			}
 		} else {
 			handle(arg, false)
 		}
 	}
 }
 
-func handleUrlFile(path string) {
+func readFile(path string) ([]string, error) {
+	var result []string
 	f, err := os.Open(path)
-	check(err)
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		s := strings.TrimSpace(scanner.Text())
-		if s != "" {
-			handle(s, false)
+	if err == nil {
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			result = append(result, scanner.Text())
 		}
+		err = scanner.Err()
 	}
-	check(scanner.Err())
+	return result, err
 }
 
-func handle(arg string, pop bool) {
+func handle(arg string, pop bool) error {
 	bk, err := ebook.Download(arg, pop)
-	check(err)
+	if err != nil {
+		return err
+	}
 
-	name := bk.Name()
+	name := badfileRe.ReplaceAllString(unorm.Normalize(bk.Title), "_")
 	if name == "" {
-		check(errors.New("no name :("))
+		return errors.New("bad or missing book title")
+	}
+	if !bk.Modified.IsZero() {
+		name = name + bk.Modified.UTC().Format("_2006-01-02_150405")
 	}
 	path := filepath.Join(destination, name+".epub")
 
@@ -106,22 +121,30 @@ func handle(arg string, pop bool) {
 		_, err := os.Stat(path)
 		if err == nil {
 			log.Printf("%q already exists.\n\n", path)
-			return
+			return nil
 		}
 	}
 	if !pop {
-		handle(arg, true)
-		return
+		return handle(arg, true)
 	}
-	f, err := os.Create(path)
-	check(err)
-	defer f.Close()
 
-	check(bk.Write(f))
+	output, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	err = bk.Write(output)
+	output.Close()
+	if err != nil {
+		return err
+	}
 	log.Printf("%q written\n\n", path)
 
 	if send {
-		check(email.SendFile(address, path, "application/epub+zip", secrets))
+		const epubContentType = "application/epub+zip"
+		if err = email.SendFile(address, path, epubContentType, secrets); err != nil {
+			return err
+		}
 		log.Printf("Sent message to %q.\n\n", address)
 	}
+	return nil
 }

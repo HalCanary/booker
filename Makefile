@@ -9,13 +9,27 @@ booker: $(shell find . -name '*.go')
 clean:
 	rm -f booker
 
-test:
+test: 
 	go test ./...
-
-doc:
-	for x in `go list ./...`; do go doc --all $$x > docs/`basename $$x`.txt; done
 
 fmt:
 	find . -type f -name '*.go' -exec gofmt -w {} \;
 
-.PHONY: clean clean-all test all doc fmt
+define test_build_rule
+.PHONY: test.$(1)
+test.$(1):
+	go test -v ./$(1)
+endef
+
+define docs_build_rule
+doc: docs/$(1).txt
+docs/$(1).txt: $(wildcard $(1)/*.go)
+	@ mkdir -p $$(dir $$@)
+	go doc --all ./$(1) > $$@
+endef
+
+packages := $(shell go list ./... | sed s@^$(shell go list -m)/@@)
+$(foreach x,$(packages),$(eval $(call test_build_rule,$x)))
+$(foreach x,$(packages),$(eval $(call docs_build_rule,$x)))
+
+.PHONY: all clean doc fmt test

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"net/textproto"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/HalCanary/booker/humanize"
@@ -34,7 +36,7 @@ type EmailSecrets struct {
 // Attachment for an email.
 type Attachment struct {
 	Filename    string
-	ContentType string
+	ContentType string // If empty, determined via http.DetectContentType.
 	Data        []byte
 }
 
@@ -76,34 +78,49 @@ func (m Email) Send(secrets EmailSecrets) error {
 	return smtp.SendMail(secrets.SmtpHost+":587", auth, secrets.SmtpUser, to, msg)
 }
 
+func encodeHeader(out io.StringWriter, key, s string) {
+	if s == "" {
+		return
+	}
+	out.WriteString(key)
+	out.WriteString(": ")
+	for s != "" {
+		word, next, found := strings.Cut(s, " ")
+		s = next
+		out.WriteString(mime.QEncoding.Encode("utf-8", word))
+		if found {
+			out.WriteString(" ")
+		}
+	}
+	out.WriteString("\n")
+}
+
 // Make, but do not send an email message.
 func (mail Email) Make() []byte {
+	const boundary = "================"
 	var buffer bytes.Buffer
 	if mail.Date.IsZero() {
 		mail.Date = time.Now()
 	}
-	wb(&buffer, "Date: ", mail.Date.Format(time.RFC1123Z), "\n")
-	if mail.Subject != "" {
-		wb(&buffer, "Subject: ", mail.Subject, "\n")
-	}
-	if mail.From != "" {
-		wb(&buffer, "From: ", mail.From, "\n")
-	}
+	encodeHeader(&buffer, "Date", mail.Date.Format(time.RFC1123Z))
+	encodeHeader(&buffer, "Subject", mail.Subject)
+	encodeHeader(&buffer, "From", mail.From)
 	for _, to := range mail.To {
-		wb(&buffer, "To: ", to, "\n")
+		encodeHeader(&buffer, "To", to)
 	}
 	for _, cc := range mail.Cc {
-		wb(&buffer, "Cc: ", cc, "\n")
+		encodeHeader(&buffer, "Cc", cc)
 	}
 	for key, value := range mail.Headers {
-		wb(&buffer, key, ": ", value, "\n")
+		encodeHeader(&buffer, key, value)
 	}
-	wb(&buffer,
-		"MIME-Version: 1.0\n",
-		"Content-Type: multipart/mixed; boundary=\"================\"\n\n",
-	)
+	encodeHeader(&buffer, "MIME-Version", "1.0")
+	mixedContentType := fmt.Sprintf("multipart/mixed; boundary=%q", boundary)
+	encodeHeader(&buffer, "Content-Type", mixedContentType)
+	buffer.WriteString("\n") // end of header
+
 	mw := multipart.NewWriter(&buffer)
-	mw.SetBoundary("================")
+	mw.SetBoundary(boundary)
 	if mail.Content != "" {
 		w, _ := mw.CreatePart(textproto.MIMEHeader{
 			"Content-Type":              []string{"text/plain; charset=\"UTF-8\""},
@@ -149,12 +166,6 @@ func SendFile(dst, path, contentType string, secrets EmailSecrets) error {
 			},
 		},
 	}.Send(secrets)
-}
-
-func wb(buffer *bytes.Buffer, strings ...string) {
-	for _, s := range strings {
-		buffer.Write([]byte(s))
-	}
 }
 
 func contentDisposition(filename string) string {

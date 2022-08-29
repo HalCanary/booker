@@ -48,8 +48,6 @@ func Download(url string, pop bool) (EbookInfo, error)
 func (info EbookInfo) CalculateLastModified() time.Time
     Return the time of most recently modified chapter.
 
-func (info EbookInfo) Name() string
-
 func (info EbookInfo) Write(dst io.Writer) error
     Write the ebook as an Epub.
 
