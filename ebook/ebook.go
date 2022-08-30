@@ -46,6 +46,8 @@ ol.flat {list-style-type:none;}
 ol.flat li {list-style:none; display:inline;}
 ol.flat li::after {content:"]";}
 ol.flat li::before {content:"[";}
+div.mid {margin: 0 auto;}
+div.mid p {text-indent:0;}
 `
 
 const conatainer_xml = xml.Header + `<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
@@ -107,7 +109,7 @@ func (info EbookInfo) Write(dst io.Writer) error {
 	zw := zipper.Make(dst)
 	defer zw.Close()
 
-	if w := zw.CreateStore("mimetype", info.Modified); w != nil {
+	if w := zw.CreateStore("mimetype", time.Time{}); w != nil {
 		_, zw.Error = w.Write([]byte("application/epub+zip"))
 	}
 	if w := zw.CreateDeflate("META-INF/container.xml", info.Modified); w != nil {

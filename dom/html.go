@@ -232,6 +232,7 @@ func (node *Node) Remove() *Node {
 func (n *Node) InsertBefore(v, o *Node) {
 	(*html.Node)(n).InsertBefore((*html.Node)(v), (*html.Node)(o))
 }
+
 func (n *Node) GetParent() *Node {
 	return (*Node)(n.Parent)
 }

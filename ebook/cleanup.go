@@ -16,6 +16,10 @@ type Node = dom.Node
 // Clean up a HTML fragment.
 func Cleanup(node *Node) *Node {
 	node = cleanupStyle(node)
+	cleanupLinks(node)
+	cleanupTables(node)
+	cleanupCenter(node)
+	cleanupDoubled(node)
 	return node
 }
 
@@ -56,6 +60,89 @@ func styler(v string) string {
 		}
 	}
 	return strings.Join(result, ";")
+}
+
+func cleanupCenter(node *Node) {
+	if node != nil && node.Type == html.ElementNode {
+		if node.Data == "center" {
+			node.Data = "div"
+			if i := getNodeAttributeIndex(node, "class"); i >= 0 {
+				node.Attr[i].Val = node.Attr[i].Val + " mid"
+			} else {
+				node.AddAttribute("class", "mid")
+			}
+		}
+		if node.Data == "big" {
+			node.Data = "span"
+			node.AddAttribute("style", "font-size:larger")
+		}
+		c := node.GetFirstChild()
+		for c != nil {
+			next := c.GetNextSibling()
+			cleanupCenter(c)
+			c = next
+		}
+	}
+}
+
+func cleanupDoubled(node *Node) {
+	if node.Type == html.ElementNode {
+		data := node.Data
+		for c := node.GetFirstChild(); c != nil; {
+			next := c.GetNextSibling()
+			cleanupDoubled(c)
+			if data == "ul" && c.Type == html.ElementNode && c.Data == data {
+				(*Node)(c).Remove()
+				for c2 := c.GetFirstChild(); c2 != nil; {
+					n2 := c2.GetNextSibling()
+					node.InsertBefore(c2.Remove(), next)
+					c2 = n2
+				}
+			}
+			c = next
+		}
+	}
+}
+
+func cleanupTables(node *Node) {
+	if node != nil && node.Type == html.ElementNode {
+		if i := getNodeAttributeIndex(node, "border"); i >= 0 {
+			v := node.Attr[i].Val
+			if v != "1" && v != "" {
+				if v == "none" {
+					node.Attr[i].Val = ""
+				} else {
+					node.Attr[i].Val = "1"
+				}
+			}
+		}
+
+		c := node.GetFirstChild()
+		for c != nil {
+			next := c.GetNextSibling()
+			cleanupTables(c)
+			c = next
+		}
+		if node.FirstChild == nil {
+			switch node.Data {
+			case "tbody", "dd", "dl":
+				node.Remove()
+			}
+		}
+	}
+}
+
+func cleanupLinks(node *Node) {
+	if node != nil && node.Type == html.ElementNode {
+		if i := getNodeAttributeIndex(node, "href"); i >= 0 {
+			if strings.HasPrefix(node.Attr[i].Val, "/") {
+				node.Attr = append(node.Attr[:i], node.Attr[i+1:]...)
+			}
+		}
+		for c := node.GetFirstChild(); c != nil; c = c.GetNextSibling() {
+			cleanupLinks(c)
+		}
+	}
 }
 
 func cleanupStyle(node *Node) *Node {
@@ -126,7 +213,7 @@ func countChildren(node *Node) int {
 func getNodeAttributeIndex(node *Node, key string) int {
 	if node != nil {
 		for idx, attr := range node.Attr {
-			if attr.Key == key {
+			if attr.Namespace == "" && attr.Key == key {
 				return idx
 			}
 		}

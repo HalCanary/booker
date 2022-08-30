@@ -4,6 +4,7 @@ package zipper
 
 import (
 	"archive/zip"
+	"compress/flate"
 	"io"
 	"time"
 )
@@ -14,7 +15,13 @@ type Zipper struct {
 }
 
 func Make(dst io.Writer) Zipper {
-	return Zipper{zip.NewWriter(dst), nil}
+	zw := Zipper{zip.NewWriter(dst), nil}
+	zw.ZipWriter.RegisterCompressor(zip.Deflate, makeBestFlateWriter)
+	return zw
+}
+
+func makeBestFlateWriter(w io.Writer) (io.WriteCloser, error) {
+	return flate.NewWriter(w, flate.BestCompression)
 }
 
 func (zw *Zipper) Close() {

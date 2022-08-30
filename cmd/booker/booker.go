@@ -14,7 +14,9 @@ import (
 	"strings"
 
 	"github.com/HalCanary/booker/ebook"
+	"github.com/HalCanary/booker/tmpwriter"
 	"github.com/HalCanary/booker/email"
+	"github.com/HalCanary/booker/humanize"
 	"github.com/HalCanary/booker/unorm"
 )
 
@@ -128,16 +130,19 @@ func handle(arg string, pop bool) error {
 		return handle(arg, true)
 	}
 
-	output, err := os.Create(path)
+	f, err := tmpwriter.Make(path)
 	if err != nil {
 		return err
 	}
-	err = bk.Write(output)
-	output.Close()
-	if err != nil {
+	if err = bk.Write(&f); err != nil {
+		f.Reset()
 		return err
 	}
-	log.Printf("%q written\n\n", path)
+	size := f.Len()
+	if err = f.Close(); err != nil {
+		return err
+	}
+	log.Printf("%s written to %q\n", humanize.Humanize(int(size)), path)
 
 	if send {
 		const epubContentType = "application/epub+zip"

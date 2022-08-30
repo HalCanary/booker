@@ -9,11 +9,10 @@ import "fmt"
 func Humanize(v int) string {
 	prfx := []string{"", "K", "M", "G", "T", "P", "E"}
 	for i, s := range prfx {
-		n := v >> 10
-		if v <= 0 || n == 0 || i == len(prfx)-1 {
+		if v <= 9999 || i == len(prfx)-1 {
 			return fmt.Sprintf("%d %sB", v, s)
 		}
-		v = n
+		v = v >> 10
 	}
 	return ""
 }
