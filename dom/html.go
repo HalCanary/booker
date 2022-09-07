@@ -14,6 +14,8 @@ import (
 // Alias for golang.org/x/net/html.Node.
 type Node html.Node
 
+type Attr = map[string]string
+
 var whitespaceRegexp = regexp.MustCompile("\\s+")
 
 // Wrapper for golang.org/x/net/html.Parse.
@@ -36,7 +38,7 @@ func TextNode(data string) *Node {
 }
 
 // Return an element with given attributes and children.
-func Element(tag string, attributes map[string]string, children ...*Node) *Node {
+func Element(tag string, attributes Attr, children ...*Node) *Node {
 	node := &Node{Type: html.ElementNode, Data: tag}
 	for k, v := range attributes {
 		node.Attr = append(node.Attr, makeAttribute(k, v))
@@ -44,8 +46,12 @@ func Element(tag string, attributes map[string]string, children ...*Node) *Node 
 	return node.Append(children...)
 }
 
+func RawHtml(data string) *Node {
+	return &Node{Type: html.RawNode, Data: data}
+}
+
 func (node *Node) Append(children ...*Node) *Node {
-	if node != nil && node.Type == html.ElementNode {
+	if node != nil && (node.Type == html.ElementNode || node.Type == html.DocumentNode) {
 		for _, c := range children {
 			if c != nil {
 				(*html.Node)(node).AppendChild((*html.Node)(c))
@@ -84,11 +90,9 @@ func Elem(tag string, children ...*Node) *Node {
 
 // Generates HTML5 doc.
 func (root *Node) RenderHTML(w io.Writer) error {
-	d := html.Node{Type: html.DocumentNode}
-	dt := html.Node{Type: html.DoctypeNode, Data: "html"}
-	d.AppendChild(&dt)
-	d.AppendChild((*html.Node)(root))
-	e := html.Render(w, &d)
+	d := Node{Type: html.DocumentNode}
+	d.Append(&Node{Type: html.DoctypeNode, Data: "html"}, TextNode("\n"), root)
+	e := html.Render(w, (*html.Node)(&d))
 	w.Write([]byte{'\n'})
 	return e
 }

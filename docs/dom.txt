@@ -1,9 +1,10 @@
 package dom // import "github.com/HalCanary/booker/dom"
 
-Copyright 2022 Hal Canary Use of this program is governed by the file
-LICENSE.
+Copyright 2022 Hal Canary Use of this program is governed by the file LICENSE.
 
 TYPES
+
+type Attr = map[string]string
 
 type Node html.Node
     Alias for golang.org/x/net/html.Node.
@@ -14,11 +15,13 @@ func Comment(data string) *Node
 func Elem(tag string, children ...*Node) *Node
     Return an element with the given children.
 
-func Element(tag string, attributes map[string]string, children ...*Node) *Node
+func Element(tag string, attributes Attr, children ...*Node) *Node
     Return an element with given attributes and children.
 
 func Parse(source io.Reader) (*Node, error)
     Wrapper for golang.org/x/net/html.Parse.
+
+func RawHtml(data string) *Node
 
 func TextNode(data string) *Node
     Return a HTML node with the given text.

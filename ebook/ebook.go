@@ -70,10 +70,10 @@ func (info EbookInfo) CalculateLastModified() time.Time {
 
 func head(title, style, comment string) *Node {
 	return dom.Elem("head",
-		dom.Element("meta", map[string]string{
+		dom.Element("meta", dom.Attr{
 			"http-equiv": "Content-Type", "content": "text/html; charset=utf-8"}),
 		dom.Comment(comment),
-		dom.Element("meta", map[string]string{
+		dom.Element("meta", dom.Attr{
 			"name": "viewport", "content": "width=device-width, initial-scale=1.0"}),
 		dom.Elem("title", dom.TextNode(title)),
 		dom.Elem("style", dom.TextNode(style)),
@@ -156,7 +156,7 @@ func writeFrontmatter(info EbookInfo, dst io.Writer, cover string) error {
 		}
 		description.Append(pnode)
 	}
-	htmlNode := dom.Element("html", map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": info.Language},
+	htmlNode := dom.Element("html", dom.Attr{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": info.Language},
 		head(info.Title, bookStyle, ""),
 		dom.Elem("body",
 			dom.Elem("h1", dom.TextNode(info.Title)),
@@ -175,7 +175,7 @@ func writeChapter(chapter Chapter, url, lang string, dst io.Writer) error {
 	if chapter.Url != "" {
 		body.Append(dom.Comment(fmt.Sprintf("\n%s\n", chapter.Url)))
 	}
-	body.Append(dom.Element("h2", map[string]string{"class": "chapter"}, dom.TextNode(chapter.Title)))
+	body.Append(dom.Element("h2", dom.Attr{"class": "chapter"}, dom.TextNode(chapter.Title)))
 	if !chapter.Modified.IsZero() {
 		body.Append(dom.Elem("p", dom.Elem("em", dom.TextNode(chapter.Modified.Format("2006-01-02")))))
 	}
@@ -184,7 +184,7 @@ func writeChapter(chapter Chapter, url, lang string, dst io.Writer) error {
 		body.Append(dom.Elem("div", link(url, url)), dom.Elem("hr"))
 	}
 	htmlNode := dom.Element("html",
-		map[string]string{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": lang},
+		dom.Attr{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": lang},
 		head(chapter.Title, bookStyle, ""),
 		body,
 	)
@@ -192,20 +192,20 @@ func writeChapter(chapter Chapter, url, lang string, dst io.Writer) error {
 }
 
 func writeToc(info EbookInfo, dst io.Writer) error {
-	links := dom.Element("ol", map[string]string{"class": "flat"})
+	links := dom.Element("ol", dom.Attr{"class": "flat"})
 	for i, ch := range info.Chapters {
 		label := fmt.Sprintf("%d. %s", i+1, ch.Title)
 		links.Append(dom.Elem("li", link(fmt.Sprintf("%04d.xhtml", i), label)))
 	}
 	htmlNode := dom.Element("html",
-		map[string]string{
+		dom.Attr{
 			"xmlns":      "http://www.w3.org/1999/xhtml",
 			"xml:lang":   info.Language,
 			"xmlns:epub": "http://www.idpf.org/2007/ops",
 		},
 		head(info.Title, bookStyle, ""),
 		dom.Elem("body",
-			dom.Element("nav", map[string]string{"epub:type": "toc"}, dom.Elem("h2", dom.TextNode("Contents")), links),
+			dom.Element("nav", dom.Attr{"epub:type": "toc"}, dom.Elem("h2", dom.TextNode("Contents")), links),
 		),
 	)
 	return htmlNode.RenderXHTMLDoc(dst)
@@ -215,14 +215,14 @@ func link(url, text string) *Node {
 	if url == "" {
 		return nil
 	}
-	return dom.Element("a", map[string]string{"href": url}, dom.TextNode(text))
+	return dom.Element("a", dom.Attr{"href": url}, dom.TextNode(text))
 }
 
 func imgElem(url, alt string) *Node {
 	if url == "" {
 		return nil
 	}
-	return dom.Element("img", map[string]string{"src": url, "alt": alt})
+	return dom.Element("img", dom.Attr{"src": url, "alt": alt})
 }
 
 func randomUUID() string {
