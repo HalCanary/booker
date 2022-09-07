@@ -21,7 +21,8 @@ func Register(downloadFunction func(url string, pop bool) (EbookInfo, error)) {
 // return UnsupportedUrlError.
 // @param url - the URL of the title page of the book.
 // @param pop - set to true to download and populate the entire EbookInfo data
-//              structure, not just it's metadata.
+//
+//	structure, not just it's metadata.
 func Download(url string, pop bool) (EbookInfo, error) {
 	for _, fn := range registerdFunctions {
 		info, err := fn(url, pop)

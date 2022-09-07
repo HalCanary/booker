@@ -14,9 +14,9 @@ import (
 	"strings"
 
 	"github.com/HalCanary/booker/ebook"
-	"github.com/HalCanary/booker/tmpwriter"
 	"github.com/HalCanary/booker/email"
 	"github.com/HalCanary/booker/humanize"
+	"github.com/HalCanary/booker/tmpwriter"
 	"github.com/HalCanary/booker/unorm"
 )
 

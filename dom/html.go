@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"io"
 	"regexp"
+	"sort"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -40,8 +41,13 @@ func TextNode(data string) *Node {
 // Return an element with given attributes and children.
 func Element(tag string, attributes Attr, children ...*Node) *Node {
 	node := &Node{Type: html.ElementNode, Data: tag}
-	for k, v := range attributes {
-		node.Attr = append(node.Attr, makeAttribute(k, v))
+	keys := make([]string, 0, len(attributes))
+	for k := range attributes {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		node.Attr = append(node.Attr, makeAttribute(k, attributes[k]))
 	}
 	return node.Append(children...)
 }
