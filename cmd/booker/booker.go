@@ -122,7 +122,7 @@ func handle(arg string, pop bool) error {
 	if !overwrite {
 		_, err := os.Stat(path)
 		if err == nil {
-			log.Printf("%q already exists.\n\n", path)
+			log.Printf("Already exists: %q\n", path)
 			return nil
 		}
 	}
@@ -142,7 +142,7 @@ func handle(arg string, pop bool) error {
 	if err = f.Close(); err != nil {
 		return err
 	}
-	log.Printf("%s written to %q\n", humanize.Humanize(int(size)), path)
+	log.Printf("%7s written to %q\n", humanize.Humanize(int(size)), path)
 
 	if send {
 		const epubContentType = "application/epub+zip"
