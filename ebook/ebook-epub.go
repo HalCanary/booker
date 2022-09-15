@@ -32,6 +32,7 @@ func makePackage(info EbookInfo, uuid string, dst io.Writer, cover string) error
 		itemrefs = append(itemrefs, xmlItemref{Idref: id})
 	}
 	modified := info.Modified.UTC().Format("2006-01-02T15:04:05Z")
+	description := fmt.Sprintf("%s\n\nSOURCE: %s\nCHAPTERS: %d\n", info.Comments, info.Source, len(info.Chapters))
 	p := xmlPackage{
 		Xmlns:            "http://www.idpf.org/2007/opf",
 		XmlnsOpf:         "http://www.idpf.org/2007/opf",
@@ -51,7 +52,7 @@ func makePackage(info EbookInfo, uuid string, dst io.Writer, cover string) error
 				xmlMetaItems{XMLName: xml.Name{Local: "dc:title"}, Value: info.Title},
 				xmlMetaItems{XMLName: xml.Name{Local: "dc:language"}, Value: info.Language},
 				xmlMetaItems{XMLName: xml.Name{Local: "dc:creator"}, Value: info.Authors},
-				xmlMetaItems{XMLName: xml.Name{Local: "dc:description"}, Value: info.Comments},
+				xmlMetaItems{XMLName: xml.Name{Local: "dc:description"}, Value: description},
 				xmlMetaItems{XMLName: xml.Name{Local: "dc:source"}, Value: info.Source},
 				xmlMetaItems{XMLName: xml.Name{Local: "dc:date"}, Value: modified},
 			},

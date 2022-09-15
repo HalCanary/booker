@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/HalCanary/booker/dom"
@@ -54,7 +55,7 @@ func init() {
 		info.Authors = doc.FindOneMatchingNode2("meta", "name", "twitter:creator").GetAttribute("content")
 
 		descriptionNode := doc.FindOneMatchingNode2("div", "property", "description")
-		info.Comments = descriptionNode.ExtractText()
+		info.Comments = strings.TrimSpace(descriptionNode.ExtractText())
 
 		chapterTables := doc.FindOneMatchingNode2("table", "id", "chapters")
 
