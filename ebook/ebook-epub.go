@@ -52,6 +52,8 @@ func makePackage(info EbookInfo, uuid string, dst io.Writer, cover string) error
 				xmlMetaItems{XMLName: xml.Name{Local: "dc:language"}, Value: info.Language},
 				xmlMetaItems{XMLName: xml.Name{Local: "dc:creator"}, Value: info.Authors},
 				xmlMetaItems{XMLName: xml.Name{Local: "dc:description"}, Value: info.Comments},
+				xmlMetaItems{XMLName: xml.Name{Local: "dc:source"}, Value: info.Source},
+				xmlMetaItems{XMLName: xml.Name{Local: "dc:date"}, Value: modified},
 			},
 		},
 		ManifestItems: manifestItems,
