@@ -34,12 +34,19 @@ listed in the file `~/.ebook_address`, if it exists.  SMTP credentials are read
 from the file `~/.email_secrets.json`.  This file has the following format:
 
     {
-      "SMTP_HOST": "host.example.com",
-      "SMTP_USER": "example@example.com",
-      "SMTP_PASS": "password123",
-      "FROM_ADDR": "Example <example@example.com>",
+      "SmtpHost": "host.example.com",
+      "SmtpUser": "example@example.com",
+      "SmtpPass": "password123",
+      "FromAddr": "Example <example@example.com>",
     }
 
 ## Internal APIs
 
-See [./docs](./docs).
+-   <https://pkg.go.dev/github.com/HalCanary/booker/dom>
+-   <https://pkg.go.dev/github.com/HalCanary/booker/download>
+-   <https://pkg.go.dev/github.com/HalCanary/booker/ebook>
+-   <https://pkg.go.dev/github.com/HalCanary/booker/email>
+-   <https://pkg.go.dev/github.com/HalCanary/booker/humanize>
+-   <https://pkg.go.dev/github.com/HalCanary/booker/tmpwriter>
+-   <https://pkg.go.dev/github.com/HalCanary/booker/unorm>
+-   <https://pkg.go.dev/github.com/HalCanary/booker/zipper>

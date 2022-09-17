@@ -28,11 +28,11 @@ const crlf = "\r\n"
 // Data structure representing instructions for connecting to SMTP server.
 // Headers are additional headers to be added to outgoing email.
 type EmailSecrets struct {
-	SmtpHost string            `json:"SMTP_HOST"` // example: "smtp.gmail.com"
-	SmtpUser string            `json:"SMTP_USER"` // example: "halcanary@gmail.com"
-	SmtpPass string            `json:"SMTP_PASS"` // for gmail, is a App Password
-	FromAddr string            `json:"FROM_ADDR"`
-	Headers  map[string]string `json:"HEADERS"`
+	SmtpHost string            // example: "smtp.gmail.com"
+	SmtpUser string            // example: "halcanary@gmail.com"
+	SmtpPass string            // for gmail, is a App Password
+	FromAddr string            // example: "Hal Canary <halcanary@gmail.com>"
+	Headers  map[string]string // extra headers to be added to email.
 }
 
 // Attachment for an email.
