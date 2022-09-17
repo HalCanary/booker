@@ -1,42 +1,22 @@
+package ebook
+
 // Copyright 2022 Hal Canary
 // Use of this program is governed by the file LICENSE.
-package img
 
 import (
 	"bytes"
-	"golang.org/x/image/draw"
 	"image"
 	"image/color"
 	"image/jpeg"
 	_ "image/png"
+
+	"golang.org/x/image/draw"
 )
 
-func decode(src []byte) (image.Image, string, error) {
-	var b bytes.Reader
-	b.Reset(src)
-	return image.Decode(&b)
-}
-
-func saveJpeg(src []byte) ([]byte, error) {
-	img, fmt, err := decode(src)
-	if err != nil {
-		return nil, err
-	}
-	if fmt == "jpeg" {
-		return src, nil
-	}
-	return writeJpeg(img, 80)
-}
-
-func writeJpeg(img image.Image, quality int) ([]byte, error) {
-	var buffer bytes.Buffer
-	options := jpeg.Options{Quality: quality}
-	err := jpeg.Encode(&buffer, img, &options)
-	return buffer.Bytes(), err
-}
-
-func SaveJpegWithScale(src []byte, minWidth, minHeight int) ([]byte, error) {
-	img, fmt, err := decode(src)
+func saveJpegWithScale(src []byte, minWidth, minHeight int) ([]byte, error) {
+	var decodeReader bytes.Reader
+	decodeReader.Reset(src)
+	img, fmt, err := image.Decode(&decodeReader)
 	if err != nil {
 		return nil, err
 	}
@@ -56,5 +36,10 @@ func SaveJpegWithScale(src []byte, minWidth, minHeight int) ([]byte, error) {
 		draw.BiLinear.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Over, nil)
 		img = dst
 	}
-	return writeJpeg(img, 80)
+	var encodeBuffer bytes.Buffer
+	jpegOptions := jpeg.Options{Quality: 80}
+	if err = jpeg.Encode(&encodeBuffer, img, &jpegOptions); err != nil {
+		return nil, err
+	}
+	return encodeBuffer.Bytes(), nil
 }

@@ -10,7 +10,7 @@ import (
 	"io"
 )
 
-func makePackage(info EbookInfo, uuid string, dst io.Writer, cover string) error {
+func makePackage(info EbookInfo, uuid string, dst io.Writer, cover bool) error {
 	manifestItems := []xmlItem{
 		xmlItem{Id: "frontmatter", Href: "frontmatter.xhtml", MediaType: "application/xhtml+xml"},
 		xmlItem{Id: "toc", Href: "toc.xhtml", MediaType: "application/xhtml+xml",
@@ -21,14 +21,14 @@ func makePackage(info EbookInfo, uuid string, dst io.Writer, cover string) error
 		xmlItemref{Idref: "frontmatter"},
 		xmlItemref{Idref: "toc"},
 	}
-	if cover != "" {
-		manifestItems = append(manifestItems, xmlItem{Id: "cover", Href: cover, MediaType: "image/jpeg",
+	if cover {
+		manifestItems = append(manifestItems, xmlItem{Id: "cover", Href: "cover.jpg", MediaType: "image/jpeg",
 			Attributes: []xml.Attr{xml.Attr{Name: xml.Name{Local: "properties"}, Value: "cover-image"}}})
 	}
 	for i, _ := range info.Chapters {
 		fn := fmt.Sprintf("%04d", i)
 		id := "ch" + fn
-		manifestItems = append(manifestItems, xmlItem{Id: id, Href: "" + fn + ".xhtml", MediaType: "application/xhtml+xml"})
+		manifestItems = append(manifestItems, xmlItem{Id: id, Href: fn + ".xhtml", MediaType: "application/xhtml+xml"})
 		itemrefs = append(itemrefs, xmlItemref{Idref: id})
 	}
 	modified := info.Modified.UTC().Format("2006-01-02T15:04:05Z")

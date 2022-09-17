@@ -13,7 +13,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/HalCanary/booker/ebook"
 	"github.com/HalCanary/booker/email"
 	"github.com/HalCanary/booker/humanize"
 	"github.com/HalCanary/booker/tmpwriter"
@@ -105,7 +104,7 @@ func readFile(path string) ([]string, error) {
 }
 
 func handle(arg string, pop bool) error {
-	bk, err := ebook.Download(arg, pop)
+	bk, err := Download(arg, pop)
 	if err != nil {
 		return err
 	}

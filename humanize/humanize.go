@@ -4,8 +4,8 @@ package humanize
 
 import "fmt"
 
-// Humanize converts a byte size to a human readable number, for example: 2048
-// -> "2 kB"
+// Humanize converts a byte size to a human readable number, for example: 10240
+// becomes "10 KB.  Everything is rounded down."
 func Humanize(v int) string {
 	prfx := []string{"", "K", "M", "G", "T", "P", "E"}
 	for i, s := range prfx {

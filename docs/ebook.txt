@@ -1,18 +1,7 @@
 package ebook // import "github.com/HalCanary/booker/ebook"
 
-Copyright 2022 Hal Canary Use of this program is governed by the file LICENSE.
-
-VARIABLES
-
-var UnsupportedUrlError = errors.New("unsupported url")
-    Returned by a downloadFunction when the URL can not be handled.
-
-
-FUNCTIONS
-
-func Register(downloadFunction func(url string, pop bool) (EbookInfo, error))
-    Register the given function.
-
+Copyright 2022 Hal Canary Use of this program is governed by the file
+LICENSE.
 
 TYPES
 
@@ -24,25 +13,16 @@ type Chapter struct {
 }
 
 type EbookInfo struct {
-	Authors   string
-	CoverURL  string
-	CoverPath string
-	Comments  string
-	Title     string
-	Source    string
-	Language  string
-	Chapters  []Chapter
-	Modified  time.Time
+	Authors  string
+	Comments string
+	Title    string
+	Source   string
+	Language string
+	Chapters []Chapter
+	Modified time.Time
+	Cover    []byte
 }
     Ebook content and metadata.
-
-func Download(url string, pop bool) (EbookInfo, error)
-    Return the result of the first registered download function that does not
-    return UnsupportedUrlError. @param url - the URL of the title page of the
-    book. @param pop - set to true to download and populate the entire EbookInfo
-    data
-
-        structure, not just it's metadata.
 
 func (info EbookInfo) CalculateLastModified() time.Time
     Return the time of most recently modified chapter.

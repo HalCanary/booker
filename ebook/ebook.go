@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/HalCanary/booker/dom"
-	"github.com/HalCanary/booker/download"
-	"github.com/HalCanary/booker/img"
 	"github.com/HalCanary/booker/zipper"
 )
 
@@ -26,15 +24,14 @@ type Chapter struct {
 
 // Ebook content and metadata.
 type EbookInfo struct {
-	Authors   string
-	CoverURL  string
-	CoverPath string
-	Comments  string
-	Title     string
-	Source    string
-	Language  string
-	Chapters  []Chapter
-	Modified  time.Time
+	Authors  string
+	Comments string
+	Title    string
+	Source   string
+	Language string
+	Chapters []Chapter
+	Modified time.Time
+	Cover    []byte
 }
 
 const bookStyle = `
@@ -83,23 +80,15 @@ func head(title, style, comment string) *Node {
 // Write the ebook as an Epub.
 func (info EbookInfo) Write(dst io.Writer) error {
 	var (
-		uid      string = randomUUID()
-		jpegData []byte
-		cover    string
+		uid   string = randomUUID()
+		cover []byte
 	)
-	if info.CoverURL != "" {
-		rc, err := download.GetUrl(info.CoverURL, "", false)
+	if len(info.Cover) > 0 {
+		var err error
+		cover, err = saveJpegWithScale(info.Cover, 400, 600)
 		if err != nil {
-			log.Printf("error: %v", err)
-		} else {
-			src, _ := io.ReadAll(rc)
-			rc.Close()
-			jpegData, err = img.SaveJpegWithScale(src, 400, 600)
-			if err != nil {
-				log.Printf("error: %v", err)
-			} else {
-				cover = "cover.jpg"
-			}
+			log.Printf("Cover error: %v", err)
+			cover = nil
 		}
 	}
 	for i, chapter := range info.Chapters {
@@ -115,25 +104,25 @@ func (info EbookInfo) Write(dst io.Writer) error {
 	if w := zw.CreateDeflate("META-INF/container.xml", info.Modified); w != nil {
 		_, zw.Error = w.Write([]byte(conatainer_xml))
 	}
-	if w := zw.CreateDeflate("book/toc.ncx", info.Modified); w != nil {
+	if w := zw.CreateDeflate("book/"+"toc.ncx", info.Modified); w != nil {
 		zw.Error = makeNCX(info, uid, w)
 	}
-	if w := zw.CreateDeflate("book/content.opf", info.Modified); w != nil {
-		zw.Error = makePackage(info, uid, w, cover)
+	if w := zw.CreateDeflate("book/"+"content.opf", info.Modified); w != nil {
+		zw.Error = makePackage(info, uid, w, len(cover) > 0)
 	}
-	if w := zw.CreateDeflate("book/frontmatter.xhtml", info.Modified); w != nil {
-		zw.Error = writeFrontmatter(info, w, cover)
+	if w := zw.CreateDeflate("book/"+"frontmatter.xhtml", info.Modified); w != nil {
+		zw.Error = writeFrontmatter(info, w, len(cover) > 0)
 	}
-	if w := zw.CreateDeflate("book/toc.xhtml", info.Modified); w != nil {
+	if w := zw.CreateDeflate("book/"+"toc.xhtml", info.Modified); w != nil {
 		zw.Error = writeToc(info, w)
 	}
-	if cover != "" {
-		if w := zw.CreateStore("book/"+cover, info.Modified); w != nil {
-			_, zw.Error = w.Write(jpegData)
+	if len(cover) > 0 {
+		if w := zw.CreateStore("book/"+"cover.jpg", info.Modified); w != nil {
+			_, zw.Error = w.Write(cover)
 		}
 	}
 	for i, chapter := range info.Chapters {
-		if w := zw.CreateDeflate(fmt.Sprintf("book/%04d.xhtml", i), chapter.Modified); w != nil {
+		if w := zw.CreateDeflate(fmt.Sprintf("book/"+"%04d.xhtml", i), chapter.Modified); w != nil {
 			var churl string
 			if i+1 == len(info.Chapters) {
 				churl = chapter.Url
@@ -144,7 +133,7 @@ func (info EbookInfo) Write(dst io.Writer) error {
 	return zw.Error
 }
 
-func writeFrontmatter(info EbookInfo, dst io.Writer, cover string) error {
+func writeFrontmatter(info EbookInfo, dst io.Writer, cover bool) error {
 	description := dom.Elem("div")
 	for _, p := range strings.Split(info.Comments, "\n\n") {
 		pnode := dom.Elem("p")
@@ -156,11 +145,15 @@ func writeFrontmatter(info EbookInfo, dst io.Writer, cover string) error {
 		}
 		description.Append(pnode)
 	}
+	var img *dom.Node
+	if cover {
+		img = dom.Element("img", dom.Attr{"src": "cover.jpg", "alt": "[COVER]"})
+	}
 	htmlNode := dom.Element("html", dom.Attr{"xmlns": "http://www.w3.org/1999/xhtml", "xml:lang": info.Language},
 		head(info.Title, bookStyle, ""),
 		dom.Elem("body",
 			dom.Elem("h1", dom.TextNode(info.Title)),
-			imgElem(cover, "[COVER]"),
+			img,
 			dom.Elem("div", dom.TextNode(info.Authors)),
 			dom.Elem("div", dom.TextNode(info.Source)),
 			dom.Elem("div", dom.Elem("em", dom.TextNode(info.Modified.Format("2006-01-02")))),

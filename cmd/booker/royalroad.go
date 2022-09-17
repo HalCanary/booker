@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -26,14 +27,14 @@ var (
 )
 
 func init() {
-	ebook.Register(func(mainUrl string, populate bool) (ebook.EbookInfo, error) {
+	Register(func(mainUrl string, populate bool) (ebook.EbookInfo, error) {
 		var info ebook.EbookInfo
 		mainUrlUrl, err := url.Parse(mainUrl)
 		if err != nil {
 			return info, err
 		}
 		if mainUrlUrl.Host != "www.royalroad.com" {
-			return info, ebook.UnsupportedUrlError
+			return info, UnsupportedUrlError
 		}
 		main, err := download.GetUrl(mainUrl, "", true)
 		if err != nil {
@@ -51,12 +52,21 @@ func init() {
 			return info, fmt.Errorf("no title found: %q", mainUrl)
 		}
 
-		info.CoverURL = doc.FindOneMatchingNode2("meta", "property", "og:image").GetAttribute("content")
 		info.Authors = doc.FindOneMatchingNode2("meta", "name", "twitter:creator").GetAttribute("content")
 
 		descriptionNode := doc.FindOneMatchingNode2("div", "property", "description")
 		info.Comments = strings.TrimSpace(descriptionNode.ExtractText())
 
+		coverURL := doc.FindOneMatchingNode2("meta", "property", "og:image").GetAttribute("content")
+		if coverURL != "" {
+			rc, err := download.GetUrl(coverURL, "", false)
+			if err != nil {
+				log.Printf("cover download error: %s\n", err)
+			} else {
+				info.Cover, _ = io.ReadAll(rc)
+				rc.Close()
+			}
+		}
 		chapterTables := doc.FindOneMatchingNode2("table", "id", "chapters")
 
 		for _, row := range chapterTables.FindAllMatchingNodes("tr") {
