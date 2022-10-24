@@ -172,6 +172,16 @@ var htmlVoidElements = map[string]struct{}{
 
 func renderXHTML(w *checkedWriter, node *Node, xhtml bool) {
 	switch node.Type {
+	case html.DoctypeNode:
+		if node.Data == "html" {
+			w.Write([]byte("<!DOCTYPE html>"))
+		}
+	case html.DocumentNode:
+		for c := node.FirstChild; c != nil; c = c.NextSibling {
+			if w.Error == nil {
+				renderXHTML(w, (*Node)(c), xhtml)
+			}
+		}
 	case html.ElementNode:
 		w.Write([]byte{'<'})
 		w.Write([]byte(node.Data))

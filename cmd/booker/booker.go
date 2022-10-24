@@ -145,7 +145,7 @@ func handle(arg string, pop bool) error {
 
 	if send {
 		const epubContentType = "application/epub+zip"
-		if err = email.SendFile(address, path, epubContentType, secrets); err != nil {
+		if err = email.SendFile(email.Address{Address:address}, path, epubContentType, secrets); err != nil {
 			return err
 		}
 		log.Printf("Sent message to %q.\n\n", address)

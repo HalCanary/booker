@@ -37,7 +37,10 @@ from the file `~/.email_secrets.json`.  This file has the following format:
       "SmtpHost": "host.example.com",
       "SmtpUser": "example@example.com",
       "SmtpPass": "password123",
-      "FromAddr": "Example <example@example.com>",
+      "From": {
+        "Name: "Name Example",
+        "Address": "example@example.com"
+      },
     }
 
 ## Internal APIs

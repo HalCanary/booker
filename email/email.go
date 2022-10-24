@@ -23,7 +23,7 @@ import (
 	"github.com/HalCanary/booker/humanize"
 )
 
-const crlf = "\r\n"
+type Address = mail.Address
 
 // Data structure representing instructions for connecting to SMTP server.
 // Headers are additional headers to be added to outgoing email.
@@ -31,7 +31,7 @@ type EmailSecrets struct {
 	SmtpHost string            // example: "smtp.gmail.com"
 	SmtpUser string            // example: "halcanary@gmail.com"
 	SmtpPass string            // for gmail, is a App Password
-	FromAddr string            // example: "Hal Canary <halcanary@gmail.com>"
+	From     Address           // example: "Hal Canary <halcanary@gmail.com>"
 	Headers  map[string]string // extra headers to be added to email.
 }
 
@@ -45,10 +45,10 @@ type Attachment struct {
 // An electric mail message.
 type Email struct {
 	Date        time.Time
-	To          []string
-	Cc          []string
-	Bcc         []string
-	From        string
+	To          []Address
+	Cc          []Address
+	Bcc         []Address
+	From        Address
 	Subject     string
 	Content     string
 	Attachments []Attachment
@@ -67,65 +67,111 @@ func GetSecrets(path string) (EmailSecrets, error) {
 
 // Send the given email using the provided SMTP secrets.
 func (m Email) Send(secrets EmailSecrets) error {
-	to := append(append(m.To, m.Cc...), m.Bcc...)
-	for i, a := range to {
-		addr, err := mail.ParseAddress(a)
-		if err != nil {
-			return err
+	to := make([]string, 0, len(m.To)+len(m.Cc)+len(m.Bcc))
+	for _, list := range [...][]Address{m.To, m.Cc, m.Bcc} {
+		for _, a := range list {
+			to = append(to, a.Address)
 		}
-		to[i] = addr.Address
 	}
-	msg := m.Make()
+	if len(secrets.Headers) > 0 {
+		old := m.Headers
+		m.Headers = make(map[string]string, len(old)+len(secrets.Headers))
+		for _, d := range [...]map[string]string{old, secrets.Headers} {
+			for k, v := range d {
+				m.Headers[k] = v
+			}
+		}
+	}
+	var buffer bytes.Buffer
+	m.Make(&buffer)
+	msg := buffer.Bytes()
 	auth := smtp.PlainAuth("", secrets.SmtpUser, secrets.SmtpPass, secrets.SmtpHost)
 	return smtp.SendMail(secrets.SmtpHost+":587", auth, secrets.SmtpUser, to, msg)
 }
 
-func encodeHeader(out io.StringWriter, key, s string) {
+func qencode(out io.Writer, s string) {
+	//out.Write([]byte(mime.QEncoding.Encode("utf-8", s)))
+	for s != "" {
+		idx := strings.Index(s, " ") + 1
+		if idx <= 0 {
+			idx = len(s)
+		}
+		out.Write([]byte(mime.QEncoding.Encode("utf-8", s[:idx])))
+		s = s[idx:]
+	}
+}
+
+var (
+	space = [...]byte{' '}
+	comma = [...]byte{','}
+	colon = [...]byte{':'}
+	crlf  = [...]byte{'\r', '\n'}
+)
+
+func encodeHeader(out io.Writer, key, s string) {
 	if s == "" {
 		return
 	}
-	out.WriteString(key)
-	out.WriteString(": ")
-	for s != "" {
-		word, next, found := strings.Cut(s, " ")
-		s = next
-		out.WriteString(mime.QEncoding.Encode("utf-8", word))
-		if found {
-			out.WriteString(" ")
-		}
-	}
-	out.WriteString(crlf)
+	io.WriteString(out, textproto.CanonicalMIMEHeaderKey(key))
+	io.WriteString(out, ": ")
+	qencode(out, s)
+	io.WriteString(out, "\r\n")
 }
 
-// Make, but do not send an email message.
-func (mail Email) Make() []byte {
-	const boundary = "================"
-	const mixedContentType = "multipart/mixed; boundary=\"" + boundary + "\""
-	var buffer bytes.Buffer
+func encodeMultiheader(out io.Writer, key string, values []Address) {
+	if len(values) > 0 {
+		io.WriteString(out, textproto.CanonicalMIMEHeaderKey(key))
+		io.WriteString(out, ":")
+		for i, val := range values {
+			io.WriteString(out, " ")
+			io.WriteString(out, val.String())
+			if i+1 != len(values) {
+				io.WriteString(out, ",")
+			}
+			io.WriteString(out, "\r\n")
+		}
+	}
+}
+
+func (mail Email) makeHeader(out io.Writer) {
 	if mail.Date.IsZero() {
 		mail.Date = time.Now()
 	}
-	encodeHeader(&buffer, "Date", mail.Date.Format(time.RFC1123Z))
-	encodeHeader(&buffer, "Subject", mail.Subject)
-	encodeHeader(&buffer, "From", mail.From)
-	for _, to := range mail.To {
-		encodeHeader(&buffer, "To", to)
-	}
-	for _, cc := range mail.Cc {
-		encodeHeader(&buffer, "Cc", cc)
-	}
+	encodeHeader(out, "Date", mail.Date.Format(time.RFC1123Z))
+	encodeHeader(out, "Subject", mail.Subject)
+	out.Write([]byte("From: "))
+	out.Write([]byte(mail.From.String()))
+	out.Write(crlf[:])
+	encodeMultiheader(out, "To", mail.To)
+	encodeMultiheader(out, "Cc", mail.Cc)
 	for key, value := range mail.Headers {
-		encodeHeader(&buffer, key, value)
+		encodeHeader(out, key, value)
 	}
-	encodeHeader(&buffer, "MIME-Version", "1.0")
-	encodeHeader(&buffer, "Content-Type", mixedContentType)
-	buffer.WriteString(crlf) // end of header
+}
 
-	mw := multipart.NewWriter(&buffer)
+// Make, but do not send an email message.
+func (mail Email) Make(out io.Writer) {
+	const boundary = "================"
+	mail.makeHeader(out)
+	encodeHeader(out, "MIME-Version", "1.0")
+
+	if len(mail.Attachments) == 0 {
+		encodeHeader(out, "Content-Type", `text/plain; charset="UTF-8"`)
+		encodeHeader(out, "Content-Transfer-Encoding", "quoted-printable")
+		out.Write(crlf[:]) // end of header
+		quotedprintableWrite(mail.Content, out)
+		out.Write(crlf[:])
+		return
+	}
+
+	encodeHeader(out, "Content-Type", `multipart/mixed; boundary="`+boundary+`"`)
+	out.Write(crlf[:]) // end of header
+
+	mw := multipart.NewWriter(out)
 	mw.SetBoundary(boundary)
 	if mail.Content != "" {
 		w, _ := mw.CreatePart(textproto.MIMEHeader{
-			"Content-Type":              []string{"text/plain; charset=\"UTF-8\""},
+			"Content-Type":              []string{`text/plain; charset="UTF-8"`},
 			"Content-Transfer-Encoding": []string{"quoted-printable"},
 		})
 		quotedprintableWrite(mail.Content, w)
@@ -144,11 +190,10 @@ func (mail Email) Make() []byte {
 		base64Write(attachment.Data, w)
 	}
 	mw.Close()
-	return buffer.Bytes()
 }
 
 // Send a file to a single destination.
-func SendFile(dst, path, contentType string, secrets EmailSecrets) error {
+func SendFile(dst Address, path, contentType string, secrets EmailSecrets) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -156,8 +201,8 @@ func SendFile(dst, path, contentType string, secrets EmailSecrets) error {
 	base := filepath.Base(path)
 	subject := fmt.Sprintf("(%s) %s", humanize.Humanize(len(data)), base)
 	return Email{
-		From:    secrets.FromAddr,
-		To:      []string{dst},
+		From:    secrets.From,
+		To:      []Address{dst},
 		Subject: subject,
 		Content: "☺",
 		Attachments: []Attachment{
@@ -184,7 +229,6 @@ func quotedprintableWrite(src string, dst io.Writer) {
 }
 
 func base64Write(src []byte, dst io.Writer) {
-	endofline := []byte(crlf)
 	const linelength = 57
 	const bufferlength = 78 // base64.StdEncoding.EncodedLen(57) + 2
 	var buffer [bufferlength]byte
@@ -196,7 +240,7 @@ func base64Write(src []byte, dst io.Writer) {
 		el := base64.StdEncoding.EncodedLen(l)
 		base64.StdEncoding.Encode(buffer[:el], src[:l])
 		src = src[l:]
-		copy(buffer[el:el+2], endofline)
+		copy(buffer[el:el+2], crlf[:])
 		dst.Write(buffer[:el+2])
 	}
 }
