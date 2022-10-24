@@ -186,7 +186,7 @@ func renderXHTML(w *checkedWriter, node *Node, xhtml bool) {
 		w.Write([]byte{'<'})
 		w.Write([]byte(node.Data))
 		for _, attr := range node.Attr {
-			ok := attr.Namespace != ""
+			ok := !xhtml || attr.Namespace != ""
 			if !ok {
 				_, ok = xhtmlattribs[attr.Key]
 			}
