@@ -103,6 +103,16 @@ func (root *Node) RenderHTML(w io.Writer) error {
 	return e
 }
 
+// Generates HTML5 doc.
+func (root *Node) RenderHTMLExperimental(w io.Writer) error {
+	d := Node{Type: html.DocumentNode}
+	d.Append(&Node{Type: html.DoctypeNode, Data: "html"}, TextNode("\n"), root)
+	cw := checkedWriter{Writer: w}
+	renderXHTML(&cw, d, false)
+	cw.Write([...]byte{'\n'})
+	return cw.Error
+}
+
 // Generates XHTML1 doc.
 func (root *Node) RenderXHTMLDoc(w io.Writer) error {
 	if root == nil || w == nil {
@@ -110,7 +120,7 @@ func (root *Node) RenderXHTMLDoc(w io.Writer) error {
 	}
 	w.Write([]byte(xml.Header))
 	cw := checkedWriter{Writer: w}
-	renderXHTML(&cw, root)
+	renderXHTML(&cw, root, true)
 	cw.Write([]byte{'\n'})
 	return cw.Error
 }
@@ -144,7 +154,23 @@ var xhtmlattribs = map[string]struct{}{
 	"xmlns":      struct{}{},
 }
 
-func renderXHTML(w *checkedWriter, node *Node) {
+var htmlVoidElements = map[string]struct{}{
+	"area":   struct{}{},
+	"base":   struct{}{},
+	"br":     struct{}{},
+	"col":    struct{}{},
+	"embed":  struct{}{},
+	"hr":     struct{}{},
+	"img":    struct{}{},
+	"input":  struct{}{},
+	"link":   struct{}{},
+	"meta":   struct{}{},
+	"source": struct{}{},
+	"track":  struct{}{},
+	"wbr":    struct{}{},
+}
+
+func renderXHTML(w *checkedWriter, node *Node, xhtml bool) {
 	switch node.Type {
 	case html.ElementNode:
 		w.Write([]byte{'<'})
@@ -167,12 +193,21 @@ func renderXHTML(w *checkedWriter, node *Node) {
 			}
 		}
 		if node.FirstChild == nil {
-			w.Write([]byte{'/', '>'})
+			if xhtml {
+				w.Write([]byte{'/', '>'})
+			} else {
+				_, isVoidElement := htmlVoidElements[node.Data]
+				if isVoidElement {
+					w.Write([]byte{'>'})
+				} else {
+					w.Write([]byte{'/', '>'})
+				}
+			}
 		} else {
 			w.Write([]byte{'>'})
 			for c := node.FirstChild; c != nil; c = c.NextSibling {
 				if w.Error == nil {
-					renderXHTML(w, (*Node)(c))
+					renderXHTML(w, (*Node)(c), xhtml)
 				}
 			}
 			w.Write([]byte{'<', '/'})
