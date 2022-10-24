@@ -218,7 +218,7 @@ func renderXHTML(w *checkedWriter, node *Node, xhtml bool) {
 			for c := node.FirstChild; c != nil; c = c.NextSibling {
 				if w.Error == nil {
 					if (node.Data == "script" || node.Data == "style") && c.Type == html.TextNode {
-						w.Write([]byte(node.Data))
+						w.Write([]byte(c.Data))
 					} else {
 						renderXHTML(w, (*Node)(c), xhtml)
 					}
