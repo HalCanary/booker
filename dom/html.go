@@ -108,8 +108,8 @@ func (root *Node) RenderHTMLExperimental(w io.Writer) error {
 	d := Node{Type: html.DocumentNode}
 	d.Append(&Node{Type: html.DoctypeNode, Data: "html"}, TextNode("\n"), root)
 	cw := checkedWriter{Writer: w}
-	renderXHTML(&cw, d, false)
-	cw.Write([...]byte{'\n'})
+	renderXHTML(&cw, &d, false)
+	cw.Write([]byte{'\n'})
 	return cw.Error
 }
 
