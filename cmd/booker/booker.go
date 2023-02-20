@@ -30,7 +30,8 @@ var (
 	send      bool
 	overwrite bool
 	flagset   flag.FlagSet
-	badfileRe = regexp.MustCompile("[^A-Za-z0-9._+-]+")
+	badfileRe = regexp.MustCompile("[/\\?*|\"<>]+")
+	//badfileRe = regexp.MustCompile("[^A-Za-z0-9._+-]+")
 )
 
 func init() {
@@ -114,7 +115,7 @@ func handle(arg string, pop bool) error {
 		return errors.New("bad or missing book title")
 	}
 	if !bk.Modified.IsZero() {
-		name = name + bk.Modified.UTC().Format("_2006-01-02_150405")
+		name = name + bk.Modified.UTC().Format(" [2006-01-02 15:04:05]")
 	}
 	path := filepath.Join(destination, name+".epub")
 
@@ -145,7 +146,7 @@ func handle(arg string, pop bool) error {
 
 	if send {
 		const epubContentType = "application/epub+zip"
-		if err = email.SendFile(email.Address{Address:address}, path, epubContentType, secrets); err != nil {
+		if err = email.SendFile(email.Address{Address: address}, path, epubContentType, secrets); err != nil {
 			return err
 		}
 		log.Printf("Sent message to %q.\n\n", address)
