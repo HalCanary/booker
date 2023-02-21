@@ -27,12 +27,16 @@ func check(err error) {
 }
 
 var (
-	send      bool
-	overwrite bool
-	flagset   flag.FlagSet
-	badfileRe = regexp.MustCompile("[/\\?*|\"<>]+")
-	//badfileRe = regexp.MustCompile("[^A-Za-z0-9._+-]+")
+	send         bool
+	overwrite    bool
+	flagset      flag.FlagSet
+	badfileRe    = regexp.MustCompile("[/\\?*|\"<>]+")
+	apostropheRe = regexp.MustCompile("[ʼ’‘]")
 )
+
+func normalize(s string) string {
+	return apostropheRe.ReplaceAllString(badfileRe.ReplaceAllString(unorm.Normalize(s), "_"), "'")
+}
 
 func init() {
 	flagset.Init("", flag.ExitOnError)
@@ -110,7 +114,7 @@ func handle(arg string, pop bool) error {
 		return err
 	}
 
-	name := badfileRe.ReplaceAllString(unorm.Normalize(bk.Title), "_")
+	name := normalize(bk.Title)
 	if name == "" {
 		return errors.New("bad or missing book title")
 	}
