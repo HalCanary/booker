@@ -195,6 +195,15 @@ func cleanupStyle(node *Node) *Node {
 					node.Remove()
 				}
 			}
+			if node.Data == "img" {
+				if i := getNodeAttributeIndex(node, "src"); i >= 0 {
+					if node.Attr[i].Val == "" {
+						node.Attr[i].Val = "data:null;,"
+					}
+				} else {
+					node.Attr = append(node.Attr, html.Attribute{Key: "src", Val: "data:null;,"})
+				}
+			}
 		}
 	}
 	return node
