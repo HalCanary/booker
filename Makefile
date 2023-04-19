@@ -9,7 +9,7 @@ booker: $(shell find . -name '*.go')
 clean:
 	rm -f booker
 
-test: 
+test:
 	go test ./...
 
 fmt:
@@ -24,4 +24,8 @@ endef
 packages := $(shell go list ./... | sed s@^$(shell go list -m)/@@)
 $(foreach x,$(packages),$(eval $(call test_build_rule,$x)))
 
-.PHONY: all clean fmt test
+update_deps:
+	go get -u ./...
+	go mod tidy
+
+.PHONY: all clean fmt test update_deps
