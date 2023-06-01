@@ -54,6 +54,14 @@ ZXN0YXMgdGVtcG9yIHNvZGFsZXMuICBQZWxsZW50ZXNxdWUgZWdldAphdWN0b3IgbWF1cmlzLg==
 --================--
 `
 
+func toQuotedPrintable(s string) string {
+	var b bytes.Buffer
+	qpw := quotedprintable.NewWriter(&b)
+	io.WriteString(qpw, s)
+	qpw.Close()
+	return b.String()
+}
+
 func TestEmail(t *testing.T) {
 	mail := Email{
 		Date:    time.Date(2022, time.January, 1, 0, 0, 0, 0, time.UTC),
@@ -300,25 +308,113 @@ func TestMimeHeader(t *testing.T) {
 }
 
 // //
-// func foo() {
-// 	mediaType, _, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	if strings.HasPrefix(mediaType, "multipart/") {
-// 	} else {
-// 		switch strings.ToUpper(msg.Header.Get("Content-Transfer-Encoding")) {
-// 		case "BASE64":
-// 			encoded, _ := io.ReadAll(msg.Body)
-// 			content, _ := base64.StdEncoding.DecodeString(string(encoded))
-// 			t.Logf("\n%s\n", content)
-// 		case "QUOTED-PRINTABLE":
-// 			content, _ := io.ReadAll(quotedprintable.NewReader(msg.Body))
-// 			t.Logf("\n%s\n", content)
-// 		default:
-// 			content, _ := io.ReadAll(msg.Body)
-// 			t.Logf("\n%s\n", content)
-// 		}
-// 	}
+//
+//	func foo() {
+//		mediaType, _, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
+//		if err != nil {
+//			t.Fatal(err)
+//		}
+//		if strings.HasPrefix(mediaType, "multipart/") {
+//		} else {
+//			switch strings.ToUpper(msg.Header.Get("Content-Transfer-Encoding")) {
+//			case "BASE64":
+//				encoded, _ := io.ReadAll(msg.Body)
+//				content, _ := base64.StdEncoding.DecodeString(string(encoded))
+//				t.Logf("\n%s\n", content)
+//			case "QUOTED-PRINTABLE":
+//				content, _ := io.ReadAll(quotedprintable.NewReader(msg.Body))
+//				t.Logf("\n%s\n", content)
+//			default:
+//				content, _ := io.ReadAll(msg.Body)
+//				t.Logf("\n%s\n", content)
+//			}
+//		}
 //
 // }
+
+const ics = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//ical.marudot.com//iCal Event Maker
+CALSCALE:GREGORIAN
+BEGIN:VTIMEZONE
+TZID:America/New_York
+LAST-MODIFIED:20201011T015911Z
+TZURL:http://tzurl.org/zoneinfo-outlook/America/New_York
+X-LIC-LOCATION:America/New_York
+BEGIN:DAYLIGHT
+TZNAME:EDT
+TZOFFSETFROM:-0500
+TZOFFSETTO:-0400
+DTSTART:19700308T020000
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU
+END:DAYLIGHT
+BEGIN:STANDARD
+TZNAME:EST
+TZOFFSETFROM:-0400
+TZOFFSETTO:-0500
+DTSTART:19701101T020000
+RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+DTSTAMP:20230424T131500Z
+UID:1682342079292-55595@ical.marudot.com
+DTSTART;TZID=America/New_York:20230429T120000
+DTEND;TZID=America/New_York:20230429T130000
+SUMMARY:FOO BAR
+DESCRIPTION:This is a test.
+LOCATION:9 UPTON CT\, DURHAM NC 27713-7573
+END:VEVENT
+END:VCALENDAR
+`
+
+var icsExpected = toDos(`Date: Sat, 01 Jan 2022 00:00:00 +0000
+Subject: test
+From: "Z" <z@example.com>
+To: "A" <a@example.com>
+Mime-Version: 1.0
+Content-Type: multipart/mixed; boundary="================"
+
+--================
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain; charset="UTF-8"
+
+`) + toQuotedPrintable(testmessage2) + toDos(`
+--================
+Content-Disposition: attachment; filename="invite.ics"
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/calendar
+MIME-Version: 1.0
+
+`) + toQuotedPrintable(ics) + toDos(`
+--================--
+`)
+
+func toDos(s string) string {
+	return strings.ReplaceAll(s, "\n", "\r\n")
+}
+
+func TestEmail4(t *testing.T) {
+	m := Email{
+		Date:    time.Date(2022, time.January, 1, 0, 0, 0, 0, time.UTC),
+		To:      []Address{Address{"A", "a@example.com"}},
+		From:    Address{"Z", "z@example.com"},
+		Subject: "test",
+		Content: testmessage2,
+		Headers: map[string]string{},
+		Attachments: []Attachment{
+			Attachment{
+				Filename:    "invite.ics",
+				ContentType: "text/calendar",
+				Data:        []byte(ics),
+				Textual:     true,
+			},
+		},
+	}
+	var buffer bytes.Buffer
+	m.Make(&buffer)
+	result := buffer.String()
+	if result != icsExpected {
+		t.Errorf("Error: %q != %q", result, icsExpected)
+	}
+}

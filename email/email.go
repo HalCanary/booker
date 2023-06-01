@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/HalCanary/booker/humanize"
 )
@@ -37,22 +38,23 @@ type EmailSecrets struct {
 
 // Attachment for an email.
 type Attachment struct {
-	Filename    string
-	ContentType string // If empty, determined via http.DetectContentType.
+	Filename    string // Optional
+	ContentType string // If empty, determined via http.DetectContentType
 	Data        []byte
+	Textual     bool // If true and Data is valid UTF-8, then encode as quoted-printable over base64
 }
 
 // An electric mail message.
 type Email struct {
-	Date        time.Time
+	Date        time.Time // If not set, use time.Now()
 	To          []Address
 	Cc          []Address
 	Bcc         []Address
 	From        Address
 	Subject     string
-	Content     string
+	Content     string // Assumed to be text/plain.
 	Attachments []Attachment
-	Headers     map[string]string
+	Headers     map[string]string // Optional extra headers.
 }
 
 // Read email secrets from the given file.
@@ -102,10 +104,11 @@ func qencode(out io.Writer, s string) {
 }
 
 var (
-	space = [...]byte{' '}
-	comma = [...]byte{','}
-	colon = [...]byte{':'}
-	crlf  = [...]byte{'\r', '\n'}
+	space      = [...]byte{' '}
+	comma      = [...]byte{','}
+	colon      = [...]byte{':'}
+	colonspace = [...]byte{':', ' '}
+	crlf       = [...]byte{'\r', '\n'}
 )
 
 func encodeHeader(out io.Writer, key, s string) {
@@ -113,22 +116,22 @@ func encodeHeader(out io.Writer, key, s string) {
 		return
 	}
 	io.WriteString(out, textproto.CanonicalMIMEHeaderKey(key))
-	io.WriteString(out, ": ")
+	out.Write(colonspace[:])
 	qencode(out, s)
-	io.WriteString(out, "\r\n")
+	out.Write(crlf[:])
 }
 
 func encodeMultiheader(out io.Writer, key string, values []Address) {
 	if len(values) > 0 {
 		io.WriteString(out, textproto.CanonicalMIMEHeaderKey(key))
-		io.WriteString(out, ":")
+		out.Write(colon[:])
 		for i, val := range values {
-			io.WriteString(out, " ")
+			out.Write(space[:])
 			io.WriteString(out, val.String())
 			if i+1 != len(values) {
-				io.WriteString(out, ",")
+				out.Write(comma[:])
 			}
-			io.WriteString(out, "\r\n")
+			out.Write(crlf[:])
 		}
 	}
 }
@@ -139,9 +142,7 @@ func (mail Email) makeHeader(out io.Writer) {
 	}
 	encodeHeader(out, "Date", mail.Date.Format(time.RFC1123Z))
 	encodeHeader(out, "Subject", mail.Subject)
-	out.Write([]byte("From: "))
-	out.Write([]byte(mail.From.String()))
-	out.Write(crlf[:])
+	encodeMultiheader(out, "From", []Address{mail.From})
 	encodeMultiheader(out, "To", mail.To)
 	encodeMultiheader(out, "Cc", mail.Cc)
 	for key, value := range mail.Headers {
@@ -159,7 +160,7 @@ func (mail Email) Make(out io.Writer) {
 		encodeHeader(out, "Content-Type", `text/plain; charset="UTF-8"`)
 		encodeHeader(out, "Content-Transfer-Encoding", "quoted-printable")
 		out.Write(crlf[:]) // end of header
-		quotedprintableWrite(mail.Content, out)
+		quotedprintableWrite([]byte(mail.Content), out)
 		out.Write(crlf[:])
 		return
 	}
@@ -174,12 +175,22 @@ func (mail Email) Make(out io.Writer) {
 			"Content-Type":              []string{`text/plain; charset="UTF-8"`},
 			"Content-Transfer-Encoding": []string{"quoted-printable"},
 		})
-		quotedprintableWrite(mail.Content, w)
+		quotedprintableWrite([]byte(mail.Content), w)
 	}
 	for _, attachment := range mail.Attachments {
 		contentType := attachment.ContentType
 		if contentType == "" {
 			contentType = http.DetectContentType(attachment.Data)
+		}
+		if attachment.Textual && utf8.Valid(attachment.Data) {
+			w, _ := mw.CreatePart(textproto.MIMEHeader{
+				"Content-Type":              []string{contentType},
+				"Content-Transfer-Encoding": []string{"quoted-printable"},
+				"Content-Disposition":       []string{contentDisposition(attachment.Filename)},
+				"MIME-Version":              []string{"1.0"},
+			})
+			quotedprintableWrite(attachment.Data, w)
+			continue
 		}
 		w, _ := mw.CreatePart(textproto.MIMEHeader{
 			"Content-Type":              []string{contentType},
@@ -222,9 +233,9 @@ func contentDisposition(filename string) string {
 	return fmt.Sprintf("attachment; filename=%q", filename)
 }
 
-func quotedprintableWrite(src string, dst io.Writer) {
+func quotedprintableWrite(src []byte, dst io.Writer) {
 	qpw := quotedprintable.NewWriter(dst)
-	qpw.Write([]byte(src))
+	qpw.Write(src)
 	qpw.Close()
 }
 
