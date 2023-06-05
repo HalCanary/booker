@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/HalCanary/booker/ebook"
 	"github.com/HalCanary/booker/email"
 	"github.com/HalCanary/booker/humanize"
 	"github.com/HalCanary/booker/tmpwriter"
@@ -29,6 +30,7 @@ func check(err error) {
 var (
 	send         bool
 	overwrite    bool
+	htmlOut      bool
 	flagset      flag.FlagSet
 	badfileRe    = regexp.MustCompile("[/\\?*|\"<>]+")
 	apostropheRe = regexp.MustCompile("[ʼ’‘]")
@@ -47,6 +49,7 @@ func init() {
 	}
 	flagset.BoolVar(&send, "send", false, "also send via email")
 	flagset.BoolVar(&overwrite, "over", false, "force overwrite of output file")
+	flagset.BoolVar(&htmlOut, "html", false, "output html only.")
 	log.SetFlags(0)
 }
 
@@ -122,6 +125,39 @@ func handle(arg string, pop bool) error {
 		name = name + bk.Modified.UTC().Format(" [2006-01-02 15:04:05]")
 	}
 	path := filepath.Join(destination, name+".epub")
+
+	if htmlOut {
+		if !pop {
+			bk, err = Download(arg, true)
+			if err != nil {
+				return err
+			}
+		}
+		htmlPath := filepath.Join(destination, name+".html")
+		f, err := os.Create(htmlPath)
+		if err != nil {
+			return err
+		}
+		if err = bk.WriteHtml(f); err != nil {
+			return err
+		}
+		log.Printf("Wrote to %q\n", htmlPath)
+
+		var convertArgs []string
+		if len(bk.Cover) > 0 {
+			o, err := os.CreateTemp("", "")
+			if err == nil {
+				convertArgs = append(convertArgs, "--cover", o.Name())
+				o.Write(bk.Cover)
+				o.Close()
+			}
+		}
+		if err = ebook.ConvertToEbook(htmlPath, path, convertArgs...); err != nil {
+			return err
+		}
+		log.Printf("Wrote to %q\n", path)
+		return nil
+	}
 
 	if !overwrite {
 		_, err := os.Stat(path)

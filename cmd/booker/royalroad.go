@@ -55,6 +55,9 @@ func init() {
 		info.Authors = doc.FindOneMatchingNode2("meta", "name", "twitter:creator").GetAttribute("content")
 
 		descriptionNode := doc.FindOneMatchingNode2("div", "property", "description")
+		if descriptionNode == nil {
+			descriptionNode = doc.FindOneMatchingNode2("div", "class", "description")
+		}
 		info.Comments = strings.TrimSpace(descriptionNode.ExtractText())
 
 		coverURL := doc.FindOneMatchingNode2("meta", "property", "og:image").GetAttribute("content")

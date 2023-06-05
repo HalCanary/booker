@@ -3,11 +3,13 @@
 package ebook
 
 import (
+	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"log"
 	"math/rand"
+	"net/http"
 	"strings"
 	"time"
 
@@ -45,6 +47,7 @@ ol.flat li::after {content:"]";}
 ol.flat li::before {content:"[";}
 div.mid {margin: 0 auto;}
 div.mid p {text-indent:0;}
+div.center {margin-left:auto;margin-right:auto;}
 `
 
 const conatainer_xml = xml.Header + `<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
@@ -65,16 +68,91 @@ func (info EbookInfo) CalculateLastModified() time.Time {
 	return result
 }
 
+func meta(name, content string) *Node {
+	return dom.Element("meta", dom.Attr{"name": name, "content": content})
+}
+
 func head(title, style, comment string) *Node {
 	return dom.Elem("head",
 		dom.Element("meta", dom.Attr{
 			"http-equiv": "Content-Type", "content": "text/html; charset=utf-8"}),
 		dom.Comment(comment),
-		dom.Element("meta", dom.Attr{
-			"name": "viewport", "content": "width=device-width, initial-scale=1.0"}),
+		meta("viewport", "width=device-width, initial-scale=1.0"),
 		dom.Elem("title", dom.TextNode(title)),
 		dom.Elem("style", dom.TextNode(style)),
 	)
+}
+
+func nl() *Node {
+	return dom.TextNode("\n")
+}
+
+func dataUrl(src []byte) string {
+	return fmt.Sprintf("data:%s;base64,%s",
+		http.DetectContentType(src),
+		base64.StdEncoding.EncodeToString(src))
+}
+
+func (info EbookInfo) WriteHtml(dst io.Writer) error {
+	body := dom.Elem("body", nl())
+	if len(info.Cover) > 0 {
+		body.Append(
+			dom.Element("div", dom.Attr{"style": "text-align:center"},
+				nl(),
+				imgElem(dataUrl(info.Cover), "[COVER]"),
+				nl()),
+			nl(),
+			dom.Elem("hr"),
+			nl(),
+		)
+	}
+	body.Append(
+		dom.Elem("div", nl(),
+			dom.Elem("h1", dom.TextNode(info.Title)), nl(),
+			dom.Elem("div", dom.TextNode("Author: "+info.Authors)), nl(),
+			dom.Elem("div",
+				dom.TextNode("Source: "),
+				dom.Element("a", dom.Attr{"href": info.Source}, dom.TextNode(info.Source)),
+			), nl(),
+		), nl(),
+		dom.Elem("hr"), nl(),
+	)
+	for i, chapter := range info.Chapters {
+		attr := dom.Attr{"class": "chapter", "id": fmt.Sprintf("ch%03d", i)}
+		div := dom.Elem("div",
+			dom.Element("h2", attr, dom.TextNode(chapter.Title)), nl())
+		if chapter.Url != "" {
+			div.Append(dom.Comment(fmt.Sprintf("\n%s\n", chapter.Url)), nl())
+		}
+		if !chapter.Modified.IsZero() {
+			div.Append(dom.Elem("div", dom.Elem("em", dom.TextNode(chapter.Modified.Format("2006-01-02")))), nl())
+		}
+		div.Append(nl(), dom.Elem("hr"), nl(), chapter.Content, nl(), dom.Elem("hr"), nl())
+		if i+1 == len(info.Chapters) {
+			div.Append(dom.Elem("div", link(info.Source, info.Source)), nl(), dom.Elem("hr"), nl())
+		}
+		body.Append(div, dom.TextNode("\n\n"))
+	}
+	description := info.Source
+	if len(info.Comments) > 0 {
+		description = description + "\n\n" + info.Comments
+	}
+	htmlNode := dom.Element("html", dom.Attr{"lang": info.Language}, nl(),
+		dom.Elem("head", nl(),
+			dom.Element("meta", dom.Attr{"charset": "utf-8"}), nl(),
+			meta("viewport", "width=device-width, initial-scale=1.0"), nl(),
+			dom.Elem("title", dom.TextNode(info.Title)), nl(),
+			meta("DC.title", info.Title), nl(),
+			meta("DC.creator.aut", info.Authors), nl(),
+			meta("DC.description", description), nl(),
+			meta("DC.source", info.Source), nl(),
+			meta("DC.language", info.Language), nl(),
+			meta("DC.date.modified", info.Modified.Format("2006-01-02")), nl(),
+			dom.Elem("style", dom.TextNode(bookStyle)), nl(),
+		),
+		nl(), body, nl(),
+	)
+	return htmlNode.RenderHTML(dst)
 }
 
 // Write the ebook as an Epub.
@@ -198,7 +276,10 @@ func writeToc(info EbookInfo, dst io.Writer) error {
 		},
 		head(info.Title, bookStyle, ""),
 		dom.Elem("body",
-			dom.Element("nav", dom.Attr{"epub:type": "toc"}, dom.Elem("h2", dom.TextNode("Contents")), links),
+			dom.Element("nav",
+				dom.Attr{"epub:type": "toc", "style": "display:none;"},
+				dom.Elem("h2", dom.TextNode("Contents")),
+				links),
 		),
 	)
 	return htmlNode.RenderXHTMLDoc(dst)

@@ -3,6 +3,7 @@
 package dom
 
 import (
+	"bytes"
 	"encoding/xml"
 	"io"
 	"regexp"
@@ -25,11 +26,16 @@ func Parse(source io.Reader) (*Node, error) {
 	return (*Node)(n), err
 }
 
+var dashesRegexp = regexp.MustCompile("---*")
+
 // Return a HTML comment with the given data.
 func Comment(data string) *Node {
 	if data == "" {
 		return nil
 	}
+	data = dashesRegexp.ReplaceAllStringFunc(data, func(s string) string {
+		return string(bytes.Repeat([]byte{'~'}, len(s)))
+	})
 	return &Node{Type: html.CommentNode, Data: data}
 }
 
