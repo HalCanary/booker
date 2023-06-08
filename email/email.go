@@ -210,7 +210,7 @@ func SendFile(dst Address, path, contentType string, secrets EmailSecrets) error
 		return err
 	}
 	base := filepath.Base(path)
-	subject := fmt.Sprintf("(%s) %s", humanize.Humanize(len(data)), base)
+	subject := fmt.Sprintf("(%s) %s", humanize.Humanize(int64(len(data))), base)
 	return Email{
 		From:    secrets.From,
 		To:      []Address{dst},

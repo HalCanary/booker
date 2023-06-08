@@ -111,6 +111,14 @@ func readFile(path string) ([]string, error) {
 	return result, err
 }
 
+func fileSize(p string) int64 {
+	fileInfo, err := os.Stat(p)
+	if err != nil {
+		return 0
+	}
+	return fileInfo.Size()
+}
+
 func handle(arg string, pop bool) error {
 	bk, err := Download(arg, pop)
 	if err != nil {
@@ -126,13 +134,19 @@ func handle(arg string, pop bool) error {
 	}
 	path := filepath.Join(destination, name+".epub")
 
-	if htmlOut {
-		if !pop {
-			bk, err = Download(arg, true)
-			if err != nil {
-				return err
-			}
+	if !overwrite {
+		_, err := os.Stat(path)
+		if err == nil {
+			log.Printf("Already exists: %q\n", path)
+			return nil
 		}
+	}
+
+	if !pop {
+		return handle(arg, true)
+	}
+
+	if htmlOut {
 		htmlPath := filepath.Join(destination, name+".html")
 		f, err := os.Create(htmlPath)
 		if err != nil {
@@ -141,7 +155,7 @@ func handle(arg string, pop bool) error {
 		if err = bk.WriteHtml(f); err != nil {
 			return err
 		}
-		log.Printf("Wrote to %q\n", htmlPath)
+		log.Printf("%7s written to %q\n", humanize.Humanize(fileSize(htmlPath)), htmlPath)
 
 		var convertArgs []string
 		if len(bk.Cover) > 0 {
@@ -155,34 +169,22 @@ func handle(arg string, pop bool) error {
 		if err = ebook.ConvertToEbook(htmlPath, path, convertArgs...); err != nil {
 			return err
 		}
-		log.Printf("Wrote to %q\n", path)
-		return nil
-	}
-
-	if !overwrite {
-		_, err := os.Stat(path)
-		if err == nil {
-			log.Printf("Already exists: %q\n", path)
-			return nil
+		log.Printf("%7s written to %q\n", humanize.Humanize(fileSize(path)), path)
+	} else {
+		f, err := tmpwriter.Make(path)
+		if err != nil {
+			return err
 		}
+		if err = bk.Write(&f); err != nil {
+			f.Reset()
+			return err
+		}
+		size := f.Len()
+		if err = f.Close(); err != nil {
+			return err
+		}
+		log.Printf("%7s written to %q\n", humanize.Humanize(int64(size)), path)
 	}
-	if !pop {
-		return handle(arg, true)
-	}
-
-	f, err := tmpwriter.Make(path)
-	if err != nil {
-		return err
-	}
-	if err = bk.Write(&f); err != nil {
-		f.Reset()
-		return err
-	}
-	size := f.Len()
-	if err = f.Close(); err != nil {
-		return err
-	}
-	log.Printf("%7s written to %q\n", humanize.Humanize(int(size)), path)
 
 	if send {
 		const epubContentType = "application/epub+zip"

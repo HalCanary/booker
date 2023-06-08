@@ -6,7 +6,7 @@ package humanize
 import "testing"
 
 func TestHumanize(t *testing.T) {
-	for v, s := range map[int]string{
+	for v, s := range map[int64]string{
 		-9223372036854775808: "-9223372036854775808 B",
 		-1:                   "-1 B",
 		0:                    "0 B",

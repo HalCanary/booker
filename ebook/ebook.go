@@ -176,26 +176,30 @@ func (info EbookInfo) Write(dst io.Writer) error {
 	zw := zipper.Make(dst)
 	defer zw.Close()
 
-	if w := zw.CreateStore("mimetype", time.Time{}); w != nil {
+	modTime := info.Modified
+	if !modTime.IsZero() {
+		modTime = modTime.UTC()
+	}
+	if w := zw.CreateStore("mimetype", modTime); w != nil {
 		_, zw.Error = w.Write([]byte("application/epub+zip"))
 	}
-	if w := zw.CreateDeflate("META-INF/container.xml", info.Modified); w != nil {
+	if w := zw.CreateDeflate("META-INF/container.xml", modTime); w != nil {
 		_, zw.Error = w.Write([]byte(conatainer_xml))
 	}
-	if w := zw.CreateDeflate("book/"+"toc.ncx", info.Modified); w != nil {
+	if w := zw.CreateDeflate("book/"+"toc.ncx", modTime); w != nil {
 		zw.Error = makeNCX(info, uid, w)
 	}
-	if w := zw.CreateDeflate("book/"+"content.opf", info.Modified); w != nil {
+	if w := zw.CreateDeflate("book/"+"content.opf", modTime); w != nil {
 		zw.Error = makePackage(info, uid, w, len(cover) > 0)
 	}
-	if w := zw.CreateDeflate("book/"+"frontmatter.xhtml", info.Modified); w != nil {
+	if w := zw.CreateDeflate("book/"+"frontmatter.xhtml", modTime); w != nil {
 		zw.Error = writeFrontmatter(info, w, len(cover) > 0)
 	}
-	if w := zw.CreateDeflate("book/"+"toc.xhtml", info.Modified); w != nil {
+	if w := zw.CreateDeflate("book/"+"toc.xhtml", modTime); w != nil {
 		zw.Error = writeToc(info, w)
 	}
 	if len(cover) > 0 {
-		if w := zw.CreateStore("book/"+"cover.jpg", info.Modified); w != nil {
+		if w := zw.CreateStore("book/"+"cover.jpg", modTime); w != nil {
 			_, zw.Error = w.Write(cover)
 		}
 	}
