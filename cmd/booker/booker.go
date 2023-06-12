@@ -88,11 +88,17 @@ func main() {
 			for _, s := range lines {
 				s = strings.TrimSpace(s)
 				if s != "" {
-					handle(s, false)
+					err = handle(s, false)
+					if err != nil {
+						log.Println("Error: ", err)
+					}
 				}
 			}
 		} else {
-			handle(arg, false)
+			err = handle(arg, false)
+			if err != nil {
+				log.Println("Error: ", err)
+			}
 		}
 	}
 }

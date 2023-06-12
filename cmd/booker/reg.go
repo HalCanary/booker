@@ -5,6 +5,7 @@ package main
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/HalCanary/facility/ebook"
 )
@@ -13,10 +14,13 @@ import (
 var UnsupportedUrlError = errors.New("unsupported url")
 
 var registerdFunctions []func(url string, pop bool) (ebook.EbookInfo, error)
+var registerdFunctionsMutex sync.Mutex
 
 // Register the given function.
 func Register(downloadFunction func(url string, pop bool) (ebook.EbookInfo, error)) {
+	registerdFunctionsMutex.Lock()
 	registerdFunctions = append(registerdFunctions, downloadFunction)
+	registerdFunctionsMutex.Unlock()
 }
 
 // Return the result of the first registered download function that does not
