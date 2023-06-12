@@ -21,7 +21,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/HalCanary/booker/humanize"
+	"github.com/HalCanary/facility/humanize"
 )
 
 type Address = mail.Address

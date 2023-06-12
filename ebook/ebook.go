@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/HalCanary/booker/dom"
-	"github.com/HalCanary/booker/zipper"
+	"github.com/HalCanary/facility/dom"
+	"github.com/HalCanary/facility/zipper"
 )
 
 type Chapter struct {

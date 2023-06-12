@@ -8,23 +8,59 @@ import (
 	"io"
 	"log"
 	"net/url"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/HalCanary/booker/dom"
-	"github.com/HalCanary/booker/download"
-	"github.com/HalCanary/booker/ebook"
+	"github.com/HalCanary/facility/spinner"
+	"github.com/HalCanary/facility/dom"
+	"github.com/HalCanary/facility/download"
+	"github.com/HalCanary/facility/ebook"
 )
-
-type node = dom.Node
 
 var (
 	stripRe      = regexp.MustCompile("(?:^\\s+)|(?:\\s+$)")
 	whitespaceRe = regexp.MustCompile("\\s+")
 )
+
+func getAttribute(dst *string, root *dom.Node, tag, key, value, attribute string) {
+	if *dst == "" {
+		*dst = dom.GetAttribute(dom.FindNodeByTagAndAttrib(root, tag, key, value), attribute)
+	}
+}
+
+func getTextByTagAndAttrib(dst *string, root *dom.Node, tag, key, value string) {
+	if *dst == "" {
+		*dst = strings.TrimSpace(dom.ExtractText(dom.FindNodeByTagAndAttrib(root, tag, key, value)))
+	}
+}
+
+func populateInfo(info *ebook.EbookInfo, doc *dom.Node) {
+	if info == nil || doc == nil {
+		return
+	}
+	var coverURL string
+	getAttribute(&info.Title, doc, "meta", "name", "twitter:title", "content")
+	getTextByTagAndAttrib(&info.Title, doc, "h1", "", "")
+	getAttribute(&info.Authors, doc, "meta", "property", "books:author", "content")
+	getAttribute(&info.Authors, doc, "meta", "name", "twitter:creator", "content")
+	getTextByTagAndAttrib(&info.Authors, doc, "a", "rel", "author")
+	getTextByTagAndAttrib(&info.Comments, doc, "div", "property", "description")
+	getTextByTagAndAttrib(&info.Comments, doc, "div", "class", "description")
+	getAttribute(&info.Comments, doc, "meta", "property", "og:description", "content")
+	getAttribute(&info.Language, doc, "html", "", "", "lang")
+	getAttribute(&coverURL, doc, "meta", "property", "og:image", "content")
+	if coverURL != "" {
+		rc, err := download.GetUrl(coverURL, "", false)
+		if err != nil {
+			log.Printf("Error: cover download: %s\n", err)
+		} else {
+			info.Cover, _ = io.ReadAll(rc)
+			rc.Close()
+		}
+	}
+}
 
 func init() {
 	Register(func(mainUrl string, populate bool) (ebook.EbookInfo, error) {
@@ -47,35 +83,17 @@ func init() {
 		if err != nil {
 			return info, err
 		}
-		info.Title = doc.FindOneMatchingNode2("meta", "name", "twitter:title").GetAttribute("content")
+		populateInfo(&info, doc)
+
 		if info.Title == "" {
-			return info, fmt.Errorf("no title found: %q", mainUrl)
+			return info, fmt.Errorf("Error: no title found: %q", mainUrl)
 		}
 
-		info.Authors = doc.FindOneMatchingNode2("meta", "name", "twitter:creator").GetAttribute("content")
-
-		descriptionNode := doc.FindOneMatchingNode2("div", "property", "description")
-		if descriptionNode == nil {
-			descriptionNode = doc.FindOneMatchingNode2("div", "class", "description")
-		}
-		info.Comments = strings.TrimSpace(descriptionNode.ExtractText())
-
-		coverURL := doc.FindOneMatchingNode2("meta", "property", "og:image").GetAttribute("content")
-		if coverURL != "" {
-			rc, err := download.GetUrl(coverURL, "", false)
-			if err != nil {
-				log.Printf("cover download error: %s\n", err)
-			} else {
-				info.Cover, _ = io.ReadAll(rc)
-				rc.Close()
-			}
-		}
-		chapterTables := doc.FindOneMatchingNode2("table", "id", "chapters")
-
-		for _, row := range chapterTables.FindAllMatchingNodes("tr") {
-			link := row.FindOneMatchingNode("a")
-			path := link.GetAttribute("href")
-			title := stripRe.ReplaceAllString(whitespaceRe.ReplaceAllString(link.ExtractText(), " "), "")
+		chapterTables := dom.FindNodeByTagAndAttrib(doc, "table", "id", "chapters")
+		for _, row := range dom.FindNodesByTagAndAttrib(chapterTables, "tr", "", "") {
+			link := dom.FindNodeByTag(row, "a")
+			path := dom.GetAttribute(link, "href")
+			title := stripRe.ReplaceAllString(whitespaceRe.ReplaceAllString(dom.ExtractText(link), " "), "")
 			if path == "" || title == "" {
 				continue
 			}
@@ -85,7 +103,9 @@ func init() {
 				continue
 			}
 			var modified time.Time
-			if t, _ := strconv.ParseInt(row.FindOneMatchingNode("time").GetAttribute("unixtime"), 10, 64); t != 0 {
+
+			unixtime := dom.GetAttribute(dom.FindNodeByTagAndAttrib(row, "time", "", ""), "unixtime")
+			if t, _ := strconv.ParseInt(unixtime, 10, 64); t != 0 {
 				modified = time.Unix(t, 0)
 			}
 			info.Chapters = append(info.Chapters, ebook.Chapter{
@@ -100,12 +120,10 @@ func init() {
 			return info, nil
 		}
 		log.Printf("%q -> discovered %d chapters (%s)\n", info.Title, len(info.Chapters), info.Modified)
-		stderrStat, _ := os.Stderr.Stat()
-		charDevice := stderrStat.Mode()&os.ModeCharDevice != 0
+
+		spin := spinner.NewTerminalSpinner()
 		for i, chapter := range info.Chapters {
-			if charDevice {
-				fmt.Fprintf(os.Stderr, "\r[%d/%d]   ", i+1, len(info.Chapters))
-			}
+			spin.Printf("[%d/%d] ", i+1, len(info.Chapters))
 			chData, err := download.GetUrl(chapter.Url, mainUrl, false)
 			if err != nil {
 				return info, err
@@ -115,14 +133,13 @@ func init() {
 			if err != nil {
 				return info, err
 			}
-			info.Chapters[i].Content = ch.FindOneMatchingNode2(
-				"div", "class", "chapter-inner chapter-content").Remove()
-
+			content := dom.FindNodeByTagAndAttrib(ch, "div", "class", "chapter-inner chapter-content")
+			if content == nil {
+				return info, fmt.Errorf("Missing chapter content: %q", chapter.Url)
+			}
+			info.Chapters[i].Content = dom.Remove(content)
 		}
-		if charDevice {
-			fmt.Fprint(os.Stderr, "\r           \r")
-		}
-		info.Language = "en"
+		spin.Printf("")
 		return info, nil
 	})
 }

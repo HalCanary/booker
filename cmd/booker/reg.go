@@ -6,7 +6,7 @@ package main
 import (
 	"errors"
 
-	"github.com/HalCanary/booker/ebook"
+	"github.com/HalCanary/facility/ebook"
 )
 
 // Returned by a downloadFunction when the URL can not be handled.

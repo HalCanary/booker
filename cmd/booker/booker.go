@@ -13,11 +13,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/HalCanary/booker/ebook"
-	"github.com/HalCanary/booker/email"
-	"github.com/HalCanary/booker/humanize"
-	"github.com/HalCanary/booker/tmpwriter"
-	"github.com/HalCanary/booker/unorm"
+	"github.com/HalCanary/facility/ebook"
+	"github.com/HalCanary/facility/email"
+	"github.com/HalCanary/facility/humanize"
+	"github.com/HalCanary/facility/tmpwriter"
+	"github.com/HalCanary/facility/unorm"
 )
 
 func check(err error) {

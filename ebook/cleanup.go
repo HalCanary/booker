@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/HalCanary/booker/dom"
+	"github.com/HalCanary/facility/dom"
 	"golang.org/x/net/html"
 )
 

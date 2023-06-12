@@ -42,14 +42,3 @@ from the file `~/.email_secrets.json`.  This file has the following format:
         "Address": "example@example.com"
       },
     }
-
-## Internal APIs
-
--   <https://pkg.go.dev/github.com/HalCanary/booker/dom>
--   <https://pkg.go.dev/github.com/HalCanary/booker/download>
--   <https://pkg.go.dev/github.com/HalCanary/booker/ebook>
--   <https://pkg.go.dev/github.com/HalCanary/booker/email>
--   <https://pkg.go.dev/github.com/HalCanary/booker/humanize>
--   <https://pkg.go.dev/github.com/HalCanary/booker/tmpwriter>
--   <https://pkg.go.dev/github.com/HalCanary/booker/unorm>
--   <https://pkg.go.dev/github.com/HalCanary/booker/zipper>
