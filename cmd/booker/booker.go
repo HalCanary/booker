@@ -126,7 +126,7 @@ func fileSize(p string) int64 {
 }
 
 func handle(arg string, pop bool) error {
-	bk, err := Download(arg, pop)
+	bk, err := ebook.DownloadEbook(arg, pop)
 	if err != nil {
 		return err
 	}
