@@ -136,7 +136,7 @@ func handle(arg string, pop bool) error {
 		return errors.New("bad or missing book title")
 	}
 	if !bk.Modified.IsZero() {
-		name = name + bk.Modified.UTC().Format(" [2006-01-02 15:04:05]")
+		name = name + bk.Modified.UTC().Format(" [2006-01-02 150405]")
 	}
 	path := filepath.Join(destination, name+".epub")
 

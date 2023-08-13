@@ -2,7 +2,7 @@ module github.com/HalCanary/booker
 
 go 1.19
 
-require github.com/HalCanary/facility v1.0.0
+require github.com/HalCanary/facility v1.0.2
 
 require (
 	golang.org/x/image v0.7.0 // indirect
