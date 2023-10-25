@@ -138,9 +138,14 @@ func handle(arg string, pop bool) error {
 	if !bk.Modified.IsZero() {
 		name = name + bk.Modified.UTC().Format(" [2006-01-02 150405]")
 	}
-	path := filepath.Join(destination, name+".epub")
+	epubPath := filepath.Join(destination, name+".epub")
+	htmlPath := filepath.Join(destination, name+".html")
 
 	if !overwrite {
+		path := epubPath
+		if htmlOut {
+			path = htmlPath
+		}
 		_, err := os.Stat(path)
 		if err == nil {
 			log.Printf("Already exists: %q\n", path)
@@ -153,7 +158,6 @@ func handle(arg string, pop bool) error {
 	}
 
 	if htmlOut {
-		htmlPath := filepath.Join(destination, name+".html")
 		f, err := os.Create(htmlPath)
 		if err != nil {
 			return err
@@ -172,12 +176,12 @@ func handle(arg string, pop bool) error {
 				o.Close()
 			}
 		}
-		if err = ebook.ConvertToEbook(htmlPath, path, convertArgs...); err != nil {
+		if err = ebook.ConvertToEbook(htmlPath, epubPath, convertArgs...); err != nil {
 			return err
 		}
-		log.Printf("%7s written to %q\n", humanize.Humanize(fileSize(path)), path)
+		log.Printf("%7s written to %q\n", humanize.Humanize(fileSize(epubPath)), epubPath)
 	} else {
-		f, err := tmpwriter.Make(path)
+		f, err := tmpwriter.Make(epubPath)
 		if err != nil {
 			return err
 		}
@@ -189,12 +193,12 @@ func handle(arg string, pop bool) error {
 		if err = f.Close(); err != nil {
 			return err
 		}
-		log.Printf("%7s written to %q\n", humanize.Humanize(int64(size)), path)
+		log.Printf("%7s written to %q\n", humanize.Humanize(int64(size)), epubPath)
 	}
 
 	if send {
 		const epubContentType = "application/epub+zip"
-		if err = email.SendFile(email.Address{Address: address}, path, epubContentType, secrets); err != nil {
+		if err = email.SendFile(email.Address{Address: address}, epubPath, epubContentType, secrets); err != nil {
 			return err
 		}
 		log.Printf("Sent message to %q.\n\n", address)
