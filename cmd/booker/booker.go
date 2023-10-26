@@ -18,6 +18,7 @@ import (
 	"github.com/HalCanary/facility/humanize"
 	"github.com/HalCanary/facility/tmpwriter"
 	"github.com/HalCanary/facility/unorm"
+	"github.com/HalCanary/facility/zipper"
 )
 
 func check(err error) {
@@ -130,7 +131,6 @@ func handle(arg string, pop bool) error {
 	if err != nil {
 		return err
 	}
-
 	name := normalize(bk.Title)
 	if name == "" {
 		return errors.New("bad or missing book title")
@@ -156,16 +156,29 @@ func handle(arg string, pop bool) error {
 	if !pop {
 		return handle(arg, true)
 	}
+	bk.Cleanup()
 
 	if htmlOut {
 		f, err := os.Create(htmlPath)
 		if err != nil {
 			return err
 		}
-		if err = bk.WriteHtml(f); err != nil {
+		err = bk.WriteHtml(f)
+		f.Close()
+		if err != nil {
 			return err
 		}
 		log.Printf("%7s written to %q\n", humanize.Humanize(fileSize(htmlPath)), htmlPath)
+
+		zipPath := filepath.Join(destination, name+".zip")
+		f, err = os.Create(zipPath)
+		if err != nil {
+			return err
+		}
+		zp := zipper.Make(f)
+		bk.WriteHtml(zp.CreateDeflate(name+".html", bk.Modified))
+		zp.Close()
+		f.Close()
 
 		var convertArgs []string
 		if len(bk.Cover) > 0 {

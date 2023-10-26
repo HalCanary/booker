@@ -1,7 +1,5 @@
-github.com/HalCanary/facility v1.0.2 h1:ETR+gLTKLEkjIQ72/lGsJEcykBomn3sy15vTq5NT/f8=
-github.com/HalCanary/facility v1.0.2/go.mod h1:7fdqyhrk3r4KnNFHrWbyHxgiCZopzggREbNekCsNqWg=
-github.com/HalCanary/facility v1.0.4 h1:DUi2EdHGVPud7oQ+F3l41EQVzo8F+VMtQmqs9H8S3hA=
-github.com/HalCanary/facility v1.0.4/go.mod h1:7fdqyhrk3r4KnNFHrWbyHxgiCZopzggREbNekCsNqWg=
+github.com/HalCanary/facility v1.0.7 h1:pSGe/f09t/xI338ep+l89P6DCGZ7OgT3xEIao9g8PWs=
+github.com/HalCanary/facility v1.0.7/go.mod h1:7fdqyhrk3r4KnNFHrWbyHxgiCZopzggREbNekCsNqWg=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
