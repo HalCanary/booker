@@ -126,6 +126,11 @@ func fileSize(p string) int64 {
 	return fileInfo.Size()
 }
 
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 func handle(arg string, pop bool) error {
 	bk, err := ebook.DownloadEbook(arg, pop)
 	if err != nil {
@@ -146,8 +151,7 @@ func handle(arg string, pop bool) error {
 		if htmlOut {
 			path = htmlPath
 		}
-		_, err := os.Stat(path)
-		if err == nil {
+		if fileExists(path) {
 			log.Printf("Already exists: %q\n", path)
 			return nil
 		}
@@ -179,6 +183,7 @@ func handle(arg string, pop bool) error {
 		bk.WriteHtml(zp.CreateDeflate(name+".html", bk.Modified))
 		zp.Close()
 		f.Close()
+		log.Printf("%7s written to %q\n", humanize.Humanize(fileSize(zipPath)), zipPath)
 
 		var convertArgs []string
 		if len(bk.Cover) > 0 {
@@ -188,6 +193,10 @@ func handle(arg string, pop bool) error {
 				o.Write(bk.Cover)
 				o.Close()
 			}
+		}
+		if !overwrite && fileExists(epubPath) {
+			log.Printf("Already exists: %q\n", epubPath)
+			return nil
 		}
 		if err = ebook.ConvertToEbook(htmlPath, epubPath, convertArgs...); err != nil {
 			return err

@@ -8,6 +8,8 @@ Use of this program is governed by the file [LICENSE](./LICENSE).
 
     ./booker [FLAGS] URL [MORE_URLS]
 
+    -html
+          output a single html document
     -over
           force overwrite of output file
     -send
