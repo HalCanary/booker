@@ -22,4 +22,7 @@ update_deps:
 	go get -u ./...
 	go mod tidy
 
-.PHONY: all clean fmt test update_deps build
+install: build
+	cp build/booker ~/bin/
+
+.PHONY: all clean fmt test update_deps build install
