@@ -3,13 +3,24 @@
 
 all: test build
 
-build: $(shell find . -name '*.go') go.mod go.sum
-	mkdir -p build
+COMMANDS = $(notdir $(wildcard cmd/*))
+BINARIES = $(addprefix build/,$(COMMANDS))
+
+${BINARIES}: $(shell find . -name '*.go') go.mod go.sum
+	@mkdir -p build
 	go get ./...
 	go build -o build ./...
 
+${HOME}/bin/%: build/%
+	@mkdir -p $(dir $@)
+	cp $^ $@
+
+build: ${BINARIES}
+
+install: $(addprefix ${HOME}/bin/,${COMMANDS})
+
 clean:
-	rm -f booker
+	rm -rf build
 
 test:
 	go get ./...
@@ -22,7 +33,4 @@ update_deps:
 	go get -u ./...
 	go mod tidy
 
-install: build
-	cp build/booker ~/bin/
-
-.PHONY: all clean fmt test update_deps build install
+.PHONY: all build clean fmt install test update_deps
