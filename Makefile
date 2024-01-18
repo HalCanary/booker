@@ -3,10 +3,10 @@
 
 all: test build
 
-COMMANDS = $(notdir $(wildcard cmd/*))
-BINARIES = $(addprefix build/,$(COMMANDS))
+go_commands = $(notdir $(wildcard cmd/*))
+go_binaries = $(addprefix build/,$(go_commands))
 
-${BINARIES}: $(shell find . -name '*.go') go.mod go.sum
+${go_binaries}: $(shell find . -name '*.go') go.mod go.sum
 	@mkdir -p build
 	go get ./...
 	go build -o build ./...
@@ -15,9 +15,9 @@ ${HOME}/bin/%: build/%
 	@mkdir -p $(dir $@)
 	cp $^ $@
 
-build: ${BINARIES}
+build: ${go_binaries}
 
-install: $(addprefix ${HOME}/bin/,${COMMANDS})
+install: $(addprefix ${HOME}/bin/,${go_commands})
 
 clean:
 	rm -rf build
