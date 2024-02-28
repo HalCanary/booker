@@ -21,6 +21,7 @@ import (
 var (
 	stripRe      = regexp.MustCompile("(?:^\\s+)|(?:\\s+$)")
 	whitespaceRe = regexp.MustCompile("\\s+")
+	sWarningRe   = regexp.MustCompile("^c[^n].{42}$")
 )
 
 func init() {
@@ -112,6 +113,10 @@ func generateRREbook(mainUrl string, populate bool) (ebook.EbookInfo, error) {
 			return info, fmt.Errorf("Missing chapter content: %q", chapter.Url)
 		}
 		info.Chapters[i].Content = dom.Remove(content)
+		for _, swn := range dom.FindNodesByTagAndAttribRe(info.Chapters[i].Content,
+			"p", "class", sWarningRe) {
+			dom.Remove(swn)
+		}
 	}
 	spin.Printf("")
 	return info, nil
