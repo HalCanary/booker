@@ -34,7 +34,7 @@ var (
 	htmlOut      bool
 	flagset      flag.FlagSet
 	badfileRe    = regexp.MustCompile("[/\\?*|\"<>]+")
-	apostropheRe = regexp.MustCompile("[ʼ’‘]")
+	apostropheRe = regexp.MustCompile("[ʼ’‘:]")
 )
 
 func normalize(s string) string {
