@@ -32,6 +32,8 @@ var (
 	send         bool
 	overwrite    bool
 	htmlOut      bool
+	convert      bool
+	compress     bool
 	flagset      flag.FlagSet
 	badfileRe    = regexp.MustCompile("[/\\?*|\"<>]+")
 	apostropheRe = regexp.MustCompile("[ʼ’‘:]")
@@ -50,7 +52,9 @@ func init() {
 	}
 	flagset.BoolVar(&send, "send", false, "also send via email")
 	flagset.BoolVar(&overwrite, "over", false, "force overwrite of output file")
-	flagset.BoolVar(&htmlOut, "html", false, "output html only.")
+	flagset.BoolVar(&htmlOut, "html", false, "output html only")
+	flagset.BoolVar(&convert, "convert", false, "convert html to epub")
+	flagset.BoolVar(&compress, "compress", false, "compress html to zip")
 	log.SetFlags(0)
 }
 
@@ -174,17 +178,18 @@ func handle(arg string, pop bool) error {
 		}
 		log.Printf("%7s written to %q\n", humanize.Humanize(fileSize(htmlPath)), htmlPath)
 
-		zipPath := filepath.Join(destination, name+".zip")
-		f, err = os.Create(zipPath)
-		if err != nil {
-			return err
+		if compress {
+			zipPath := filepath.Join(destination, name+".zip")
+			f, err = os.Create(zipPath)
+			if err != nil {
+				return err
+			}
+			zp := zipper.Make(f)
+			bk.WriteHtml(zp.CreateDeflate(name+".html", bk.Modified))
+			zp.Close()
+			f.Close()
+			log.Printf("%7s written to %q\n", humanize.Humanize(fileSize(zipPath)), zipPath)
 		}
-		zp := zipper.Make(f)
-		bk.WriteHtml(zp.CreateDeflate(name+".html", bk.Modified))
-		zp.Close()
-		f.Close()
-		log.Printf("%7s written to %q\n", humanize.Humanize(fileSize(zipPath)), zipPath)
-
 		var convertArgs []string
 		if len(bk.Cover) > 0 {
 			o, err := os.CreateTemp("", "")
@@ -194,14 +199,16 @@ func handle(arg string, pop bool) error {
 				o.Close()
 			}
 		}
-		if !overwrite && fileExists(epubPath) {
-			log.Printf("Already exists: %q\n", epubPath)
-			return nil
+		if convert {
+			if !overwrite && fileExists(epubPath) {
+				log.Printf("Already exists: %q\n", epubPath)
+				return nil
+			}
+			if err = ebook.ConvertToEbook(htmlPath, epubPath, convertArgs...); err != nil {
+				return err
+			}
+			log.Printf("%7s written to %q\n", humanize.Humanize(fileSize(epubPath)), epubPath)
 		}
-		if err = ebook.ConvertToEbook(htmlPath, epubPath, convertArgs...); err != nil {
-			return err
-		}
-		log.Printf("%7s written to %q\n", humanize.Humanize(fileSize(epubPath)), epubPath)
 	} else {
 		f, err := tmpwriter.Make(epubPath)
 		if err != nil {

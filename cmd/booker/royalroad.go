@@ -19,9 +19,12 @@ import (
 )
 
 var (
-	stripRe      = regexp.MustCompile("(?:^\\s+)|(?:\\s+$)")
-	whitespaceRe = regexp.MustCompile("\\s+")
-	sWarningRe   = regexp.MustCompile("^c[^n].{42}$")
+	stripRe       = regexp.MustCompile("(?:^\\s+)|(?:\\s+$)")
+	whitespaceRe  = regexp.MustCompile("\\s+")
+	sWarningRe    = regexp.MustCompile("^c[^n].{42}$")
+	labelClassRe  = regexp.MustCompile("\\blabel\\b")
+	isCompletedRe = regexp.MustCompile("\\s*COMPLETED\\s*")
+	isStubRe      = regexp.MustCompile("\\s*STUB\\s*")
 )
 
 func init() {
@@ -62,6 +65,15 @@ func generateRREbook(mainUrl string, populate bool) (ebook.EbookInfo, error) {
 
 	if info.Title == "" {
 		return info, fmt.Errorf("Error: no title found: %q", mainUrl)
+	}
+
+	for _, label := range dom.FindNodesByTagAndAttribRe(doc, "", "class", labelClassRe) {
+		labelString := dom.ExtractText(label)
+		if isStubRe.MatchString(labelString) {
+			info.Title += " [STUB]"
+		} else if isCompletedRe.MatchString(labelString) {
+			info.Title += " [COMPLETE]"
+		}
 	}
 
 	chapterTables := dom.FindNodeByTagAndAttrib(doc, "table", "id", "chapters")
