@@ -29,14 +29,16 @@ func check(err error) {
 }
 
 var (
-	send         bool
-	overwrite    bool
-	htmlOut      bool
-	convert      bool
-	compress     bool
-	flagset      flag.FlagSet
-	badfileRe    = regexp.MustCompile("[/\\?*|\"<>]+")
-	apostropheRe = regexp.MustCompile("[ʼ’‘:]")
+	send                bool
+	overwrite           bool
+	htmlOut             bool
+	convert             bool
+	compress            bool
+	maximumChapterCount int
+	firstChapterIndex   int
+	flagset             flag.FlagSet
+	badfileRe           = regexp.MustCompile("[/\\?*|\"<>]+")
+	apostropheRe        = regexp.MustCompile("[ʼ’‘:]")
 )
 
 func normalize(s string) string {
@@ -55,6 +57,8 @@ func init() {
 	flagset.BoolVar(&htmlOut, "html", false, "output html only")
 	flagset.BoolVar(&convert, "convert", false, "convert html to epub")
 	flagset.BoolVar(&compress, "compress", false, "compress html to zip")
+	flagset.IntVar(&maximumChapterCount, "maximumChapterCount", 0, "0 is unlimited")
+	flagset.IntVar(&firstChapterIndex, "firstChapterIndex", 0, "")
 	log.SetFlags(0)
 }
 
@@ -147,8 +151,28 @@ func handle(arg string, pop bool) error {
 	if !bk.Modified.IsZero() {
 		name = name + bk.Modified.UTC().Format(" [2006-01-02 150405]")
 	}
-	epubPath := filepath.Join(destination, name+".epub")
-	htmlPath := filepath.Join(destination, name+".html")
+
+	var epubPath string
+	var htmlPath string
+	var chapterCount = len(bk.Chapters)
+	var cut = maximumChapterCount > 0 && maximumChapterCount+firstChapterIndex < chapterCount
+	if cut || firstChapterIndex > 0 {
+		if cut {
+			chapterCount = maximumChapterCount + firstChapterIndex
+			bk.Chapters = bk.Chapters[:chapterCount]
+		}
+		if firstChapterIndex > 0 && len(bk.Chapters) > firstChapterIndex {
+			bk.Chapters = bk.Chapters[firstChapterIndex:]
+		}
+		epubPath = filepath.Join(destination,
+			fmt.Sprintf("%s [%d-%d].epub", name, firstChapterIndex+1, chapterCount))
+		htmlPath = filepath.Join(destination,
+			fmt.Sprintf("%s [%d-%d].html", name, firstChapterIndex+1, chapterCount))
+
+	} else {
+		epubPath = filepath.Join(destination, name+".epub")
+		htmlPath = filepath.Join(destination, name+".html")
+	}
 
 	if !overwrite {
 		path := epubPath
