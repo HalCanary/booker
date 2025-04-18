@@ -21,7 +21,7 @@ import (
 var (
 	stripRe       = regexp.MustCompile("(?:^\\s+)|(?:\\s+$)")
 	whitespaceRe  = regexp.MustCompile("\\s+")
-	sWarningRe    = regexp.MustCompile("^c[^n].{42}$")
+	sWarningRe    = regexp.MustCompile("^c[^n].{42,}$")
 	labelClassRe  = regexp.MustCompile("\\blabel\\b")
 	isCompletedRe = regexp.MustCompile("\\s*COMPLETED\\s*")
 	isStubRe      = regexp.MustCompile("\\s*STUB\\s*")
@@ -126,7 +126,7 @@ func generateRREbook(mainUrl string, populate bool) (ebook.EbookInfo, error) {
 		}
 		info.Chapters[i].Content = dom.Remove(content)
 		for _, swn := range dom.FindNodesByTagAndAttribRe(info.Chapters[i].Content,
-			"p", "class", sWarningRe) {
+			"", "class", sWarningRe) {
 			dom.Remove(swn)
 		}
 	}
